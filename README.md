@@ -4,6 +4,8 @@
 
 CodeTrust is an evidence-first verification agent for AI-generated software changes. It reconstructs intent, maps changed surfaces, runs targeted risk gates, challenges unsafe assumptions, and produces a traceable evidence pack. Humans receive unresolved decisions instead of a second generic code review.
 
+Version 0.2 adds real GitHub pull-request ingestion, domain-impact mapping, adversarial test generation, executable failure proof, FastAPI endpoints, responsive dashboard, and non-root container packaging.
+
 ## Why this exists
 
 Coding agents scale code output faster than senior engineers can scale review. A change can pass ordinary tests yet remain architecturally unsafe: blocking I/O in async code, duplicate payment retries, broken contracts, or rollback gaps. CodeTrust sits between code generation and production.
@@ -27,6 +29,15 @@ Requirements: Python 3.11+ and [uv](https://docs.astral.sh/uv/).
 ```bash
 uv sync --extra dev
 make demo-offline
+make proof
+make serve
+```
+
+Open [http://127.0.0.1:8787](http://127.0.0.1:8787), select **Load demo**, then run verification.
+
+Generated evidence remains available without server:
+
+```bash
 open reports/latest.html
 ```
 
@@ -49,23 +60,35 @@ uv run codetrust verify \
   --output-dir reports
 ```
 
+Verify a real GitHub pull request through authenticated GitHub CLI:
+
+```bash
+uv run codetrust verify \
+  --github-pr OWNER/REPOSITORY#123 \
+  --offline \
+  --output-dir reports
+```
+
 Artifacts:
 
 - `latest.html`: visual decision dashboard for demo and judges.
 - `latest.md`: review-ready evidence report.
 - `latest.json`: integrity-hashed, machine-readable policy-gate output.
+- `adversarial-tests.md`: generated proof templates for top findings.
 
 Exit code is `1` for `BLOCK`, enabling CI enforcement.
 
 ## Architecture
 
 ```text
-Ticket + diff
+Ticket + diff / GitHub PR
     │
     ├─ Scope mapper ── changed files and line evidence
-    ├─ Risk router  ── selects relevant verification gates
-    ├─ Challenge engine ─ deterministic safety rules
-    └─ Intent synthesizer ─ model or offline fallback
+    ├─ Impact mapper ── business and technical blast radius
+    ├─ Risk router ── selects relevant verification gates
+    ├─ Challenge engine ── deterministic safety rules
+    ├─ Test designer ── generates adversarial proof
+    └─ Intent synthesizer ── model or offline fallback
               │
               ▼
        Evidence + risk score
@@ -83,12 +106,21 @@ Deterministic checks own factual evidence. Model owns intent synthesis and expla
 ## Current POC boundary
 
 - Input is a local unified diff or git range.
+- GitHub PR input requires authenticated `gh` CLI.
 - Five deterministic rules cover demo-critical risks.
 - CodeTrust does not merge or deploy.
 - It does not execute commands found inside tickets or diffs.
+- Generated tests are templates; one dedicated demo test is executable through `make proof`.
 - `PASS` means no configured gate blocked the change; it never means “proven safe.”
 
-See [POC guide](docs/POC_GUIDE.md), [architecture](docs/ARCHITECTURE.md), [delivery plan](docs/PLAN.md), [research](docs/RESEARCH.md), and [submission draft](docs/SUBMISSION.md).
+See [Talent Hack strategy](docs/TALENT_HACK_STRATEGY.md), [POC guide](docs/POC_GUIDE.md), [architecture](docs/ARCHITECTURE.md), [delivery plan](docs/PLAN.md), [research](docs/RESEARCH.md), [security](SECURITY.md), and [submission draft](docs/SUBMISSION.md).
+
+## Container
+
+```bash
+docker build -t codetrust .
+docker run --rm -p 8787:8787 codetrust
+```
 
 ## Development
 

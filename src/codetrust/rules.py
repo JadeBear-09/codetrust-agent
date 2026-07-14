@@ -6,6 +6,8 @@ from collections.abc import Callable
 from codetrust.models import ChangedFile, Finding, Severity
 
 Rule = Callable[[list[ChangedFile]], list[Finding]]
+SOURCE_SUFFIXES = (".py", ".js", ".jsx", ".ts", ".tsx", ".java", ".go", ".rs", ".kt", ".cs")
+NON_PRODUCTION_PREFIXES = ("docs/", "tests/", "test/", "demo/", "examples/", "fixtures/")
 
 
 def run_rules(files: list[ChangedFile]) -> tuple[list[Finding], list[str]]:
@@ -27,7 +29,7 @@ def run_rules(files: list[ChangedFile]) -> tuple[list[Finding], list[str]]:
 
 def _blocking_io_in_async(files: list[ChangedFile]) -> list[Finding]:
     results: list[Finding] = []
-    for file in files:
+    for file in _production_source_files(files):
         text = file.added_text
         if "async def " not in text:
             continue
@@ -54,7 +56,7 @@ def _retry_without_idempotency(files: list[ChangedFile]) -> list[Finding]:
     results: list[Finding] = []
     payment_terms = re.compile(r"\b(charge|payment|capture|debit|reconcile)\b", re.I)
     retry_terms = re.compile(r"\b(retry|attempt|backoff|for\s+\w+\s+in\s+range)\b", re.I)
-    for file in files:
+    for file in _production_source_files(files):
         text = file.added_text
         if not (payment_terms.search(text) and retry_terms.search(text)):
             continue
@@ -83,6 +85,8 @@ def _removed_api_contract(files: list[ChangedFile]) -> list[Finding]:
     results: list[Finding] = []
     contract_suffixes = (".yaml", ".yml", ".json", ".proto", ".graphql")
     for file in files:
+        if _is_non_production(file.path):
+            continue
         if not file.path.lower().endswith(contract_suffixes):
             continue
         for line in file.removed:
@@ -113,6 +117,8 @@ def _removed_api_contract(files: list[ChangedFile]) -> list[Finding]:
 def _migration_without_rollback(files: list[ChangedFile]) -> list[Finding]:
     results: list[Finding] = []
     for file in files:
+        if _is_non_production(file.path):
+            continue
         if not re.search(r"(migration|migrations|alembic|flyway|liquibase)", file.path, re.I):
             continue
         text = file.added_text
@@ -147,7 +153,9 @@ def _migration_without_rollback(files: list[ChangedFile]) -> list[Finding]:
 
 def _success_only_tests(files: list[ChangedFile]) -> list[Finding]:
     test_files = [file for file in files if re.search(r"(^|/)(test_|tests?/|.*_test\.)", file.path)]
-    production_files = [file for file in files if file not in test_files]
+    production_files = [
+        file for file in files if file not in test_files and not _is_non_production(file.path)
+    ]
     if not production_files:
         return []
     test_text = "\n".join(file.added_text for file in test_files)
@@ -184,6 +192,19 @@ def _weight(severity: Severity) -> int:
         Severity.MEDIUM: 12,
         Severity.LOW: 5,
     }[severity]
+
+
+def _production_source_files(files: list[ChangedFile]) -> list[ChangedFile]:
+    return [
+        file
+        for file in files
+        if file.path.lower().endswith(SOURCE_SUFFIXES) and not _is_non_production(file.path)
+    ]
+
+
+def _is_non_production(path: str) -> bool:
+    normalized = path.lower().lstrip("./")
+    return normalized.startswith(NON_PRODUCTION_PREFIXES)
 
 
 def risk_score(findings: list[Finding]) -> int:

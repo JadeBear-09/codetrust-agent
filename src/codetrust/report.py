@@ -14,10 +14,12 @@ def write_reports(report: VerificationReport, output_dir: Path) -> dict[str, Pat
         "json": output_dir / f"{stem}.json",
         "markdown": output_dir / f"{stem}.md",
         "html": output_dir / f"{stem}.html",
+        "tests": output_dir / "adversarial-tests.md",
     }
     paths["json"].write_text(json.dumps(report.to_dict(), indent=2) + "\n")
     paths["markdown"].write_text(render_markdown(report))
     paths["html"].write_text(render_html(report))
+    paths["tests"].write_text(render_adversarial_tests(report))
     return paths
 
 
@@ -57,13 +59,51 @@ def render_markdown(report: VerificationReport) -> str:
         )
     if not report.findings:
         lines.extend(["No deterministic finding. This is not proof of safety.", ""])
-    lines.extend(["## Human decisions", ""])
+    lines.extend(["## Impact map", ""])
+    for area in report.impact_areas:
+        paths = ", ".join(f"`{path}`" for path in area.paths)
+        lines.append(f"- **{area.name}** ({area.risk}): {paths}")
+    if not report.impact_areas:
+        lines.append("- No configured impact area matched.")
+    lines.extend(["", "## Generated adversarial tests", ""])
+    for test in report.adversarial_tests:
+        lines.append(f"- `{test.name}` for {test.rule_id}: {test.rationale}")
+    if not report.adversarial_tests:
+        lines.append("- None generated.")
+    lines.extend(["", "## Human decisions", ""])
     lines.extend(f"- {item}" for item in report.unresolved_questions)
     if not report.unresolved_questions:
         lines.append("- None raised by current gates.")
     lines.extend(["", "## Agent trace", ""])
     lines.extend(f"- `{event.step}` — {event.status}: {event.detail}" for event in report.timeline)
     lines.extend(["", f"Model: `{report.model_used or 'offline'}`", ""])
+    return "\n".join(lines)
+
+
+def render_adversarial_tests(report: VerificationReport) -> str:
+    lines = [
+        "# CodeTrust generated adversarial tests",
+        "",
+        "These templates encode missing proof. Adapt fixtures to target repository before execution.",
+        "",
+    ]
+    for test in report.adversarial_tests:
+        lines.extend(
+            [
+                f"## {test.name}",
+                "",
+                f"Rule: `{test.rule_id}`",
+                "",
+                test.rationale,
+                "",
+                "```python",
+                test.code.rstrip(),
+                "```",
+                "",
+            ]
+        )
+    if not report.adversarial_tests:
+        lines.append("No adversarial test generated for current findings.\n")
     return "\n".join(lines)
 
 
@@ -93,6 +133,20 @@ def render_html(report: VerificationReport) -> str:
         "".join(f"<li>{html.escape(item)}</li>" for item in report.unresolved_questions)
         or "<li>None raised.</li>"
     )
+    impacts = (
+        "".join(
+            f"<li><b>{html.escape(area.name)}</b><span>{html.escape(area.kind)} · {html.escape(area.risk)}</span><p>{html.escape(', '.join(area.paths))}</p></li>"
+            for area in report.impact_areas
+        )
+        or "<li>No configured impact area matched.</li>"
+    )
+    generated = (
+        "".join(
+            f'<article class="finding"><div class="finding-head"><span class="severity medium">generated proof</span><code>{html.escape(test.rule_id)}</code></div><h3>{html.escape(test.name)}</h3><p>{html.escape(test.rationale)}</p><pre>{html.escape(test.code)}</pre></article>'
+            for test in report.adversarial_tests
+        )
+        or '<article class="finding"><h3>No test generated</h3></article>'
+    )
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>CodeTrust · {report.verdict.value}</title>
@@ -109,6 +163,8 @@ def render_html(report: VerificationReport) -> str:
 <header><div class="brand">Code<i>Trust</i></div><div class="hash">EVIDENCE {report.evidence_hash[:16]}</div></header>
 <section class="hero"><div class="panel"><div class="eyebrow">Reconstructed intent</div><h1>{html.escape(report.intent)}</h1><p class="summary">{html.escape(report.summary)}</p></div><div class="panel"><div class="eyebrow">Decision</div><div class="verdict">{report.verdict.value}</div><div class="score">{report.risk_score}<small>/100</small></div><p>{report.files_changed} files · {len(report.findings)} risks</p></div></section>
 <h2>Evidence-backed findings</h2><section class="grid">{cards}</section>
+<h2>Impact map</h2><section class="panel"><ol class="trace">{impacts}</ol></section>
+<h2>Generated adversarial tests</h2><section class="grid">{generated}</section>
 <section class="panel" style="margin-top:24px"><div class="eyebrow">Human boundary</div><h2 style="margin-top:8px">Unresolved decisions</h2><ul>{questions}</ul></section>
 <h2>Agent trace</h2><section class="panel"><ol class="trace">{trace}</ol></section>
 <footer>CodeTrust · verification evidence, not automatic approval · model {html.escape(report.model_used or "offline")}</footer>

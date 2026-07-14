@@ -40,3 +40,23 @@ def test_idempotency_evidence_suppresses_payment_rule() -> None:
     findings, _ = run_rules(parse_unified_diff(diff))
 
     assert "CT-PAY-001" not in {finding.rule_id for finding in findings}
+
+
+def test_documentation_and_demo_fixtures_do_not_create_runtime_findings() -> None:
+    diff = """diff --git a/docs/retry.md b/docs/retry.md
+--- /dev/null
++++ b/docs/retry.md
+@@ -0,0 +1 @@
++Retry payment charge without idempotency.
+diff --git a/demo/payment.py b/demo/payment.py
+--- /dev/null
++++ b/demo/payment.py
+@@ -0,0 +1,3 @@
++def retry_payment(payment):
++    for attempt in range(3):
++        charge(payment)
+"""
+
+    findings, _ = run_rules(parse_unified_diff(diff))
+
+    assert findings == []
