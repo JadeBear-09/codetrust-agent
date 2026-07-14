@@ -69,6 +69,16 @@ uv run codetrust verify \
   --output-dir reports
 ```
 
+Reproduce live before/after demonstration from this private repository:
+
+```bash
+# Intentionally risky candidate: expected BLOCK 94/100
+uv run codetrust verify --github-pr JadeBear-09/codetrust-agent#2 --offline
+
+# Remediated candidate: expected PASS 0/100
+uv run codetrust verify --github-pr JadeBear-09/codetrust-agent#3 --offline
+```
+
 Artifacts:
 
 - `latest.html`: visual decision dashboard for demo and judges.
@@ -113,7 +123,7 @@ Deterministic checks own factual evidence. Model owns intent synthesis and expla
 - Generated tests are templates; one dedicated demo test is executable through `make proof`.
 - `PASS` means no configured gate blocked the change; it never means “proven safe.”
 
-See [Talent Hack strategy](docs/TALENT_HACK_STRATEGY.md), [POC guide](docs/POC_GUIDE.md), [architecture](docs/ARCHITECTURE.md), [delivery plan](docs/PLAN.md), [research](docs/RESEARCH.md), [security](SECURITY.md), and [submission draft](docs/SUBMISSION.md).
+See [Talent Hack strategy](docs/TALENT_HACK_STRATEGY.md), [measured demo results](docs/DEMO_RESULTS.md), [POC guide](docs/POC_GUIDE.md), [architecture](docs/ARCHITECTURE.md), [delivery plan](docs/PLAN.md), [research](docs/RESEARCH.md), [security](SECURITY.md), and [submission draft](docs/SUBMISSION.md).
 
 ## Container
 

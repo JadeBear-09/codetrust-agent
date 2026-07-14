@@ -49,9 +49,10 @@ CodeTrust does not silently merge or deploy. It treats tickets and code as untru
 - Executable duplicate-payment failure proof.
 - Five verification gates.
 - Offline and API-assisted modes.
-- Twelve automated tests plus lint and GitHub CI.
+- Thirteen automated tests plus lint and GitHub CI.
 - Non-root Docker packaging and health check.
 - Seeded payment demo detecting all five target failures.
+- Real private PR comparison: risky candidate `BLOCK 94/100`; remediated candidate `PASS 0/100`.
 
 ## Roadmap
 
