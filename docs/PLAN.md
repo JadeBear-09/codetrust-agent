@@ -31,24 +31,29 @@ Status: complete for baseline.
 
 ## Phase 2 — Real repository depth
 
-Target: next build session.
+Status: in progress.
 
-- Add GitHub pull-request ingestion.
-- Map imports, callers, API consumers, and database ownership.
+- [x] Add GitHub pull-request ingestion.
+- [x] Map business and technical impact areas.
+- [x] Generate adversarial test templates.
+- [x] Execute dedicated timeout-after-success failure proof.
+- [ ] Map imports, callers, API consumers, and database ownership.
 - Run project tests inside a constrained container.
-- Generate one adversarial test patch for the top finding.
+- Generate repository-adapted test patch for top finding.
 - Compare pre-fix and post-fix reports.
 
 Exit criteria: CodeTrust analyzes one real PR and proves at least one risk with an executable failing test.
 
 ## Phase 3 — Demo product
 
-Target: before hackathon rehearsal.
+Status: baseline complete.
 
-- Add “run verification” web action and live progress stream.
-- Show architecture impact map.
+- [x] Add “run verification” web action and visible progress stages.
+- [x] Show impact map.
+- [x] Add FastAPI endpoints, health check, and responsive dashboard.
+- [x] Add non-root Docker packaging.
 - Add before/after remediation comparison.
-- Add evidence-pack signature and downloadable report.
+- Add managed-key evidence signature and downloadable report.
 - Time complete demo below five minutes.
 
 Exit criteria: fresh laptop setup to verdict in under three minutes; full spoken demo in under five.
@@ -91,4 +96,3 @@ Target: final day.
 | False confidence | Evidence lines, confidence values, explicit uncertainty, and human decision boundary |
 | Demo looks scripted | Analyze an unseen small diff after main scenario |
 | Too much scope | Protect payment scenario; defer broad language coverage |
-

@@ -17,11 +17,10 @@ Open `demo/tickets/payment-reconciliation.md` and state three requirements: safe
 ### 1:00–1:30 — Run
 
 ```bash
-make demo-offline
-open reports/latest.html
+make serve
 ```
 
-Use `make demo` when API access is reliable. Keep offline command ready.
+Open `http://127.0.0.1:8787`, load demo, then run verification. Keep `make demo-offline` and generated HTML ready as fallback.
 
 ### 1:30–3:10 — Evidence
 
@@ -37,7 +36,15 @@ For each, show exact source evidence and proposed adversarial test. Do not read 
 
 ### 3:10–4:00 — Agent behavior
 
-Show agent trace: scope, challenge, intent reconstruction, decision. Explain that gates decide facts while model reconstructs intent and uncertainty. This prevents model confidence from becoming approval.
+Show scope, impact, challenge, test design, intent reconstruction, and decision. Explain that gates decide facts while model reconstructs intent and uncertainty. This prevents model confidence from becoming approval.
+
+Run executable proof:
+
+```bash
+make proof
+```
+
+Point to `assert 2 == 1`: one timeout caused two provider-side payment effects.
 
 ### 4:00–4:35 — Human boundary
 
@@ -54,6 +61,9 @@ Show one unresolved question: which business key defines payment idempotency acr
 - Run `uv sync --extra dev`.
 - Run `make test` and `make lint`.
 - Run both `make demo-offline` and `make demo` before event.
+- Run `make proof` and confirm expected failure evidence.
+- Run dashboard and API health check.
+- Build Docker image if Docker is available.
 - Keep generated HTML open in a browser tab.
 - Keep terminal font large and notifications disabled.
 - Keep a screenshot and 90-second video as backup.
@@ -75,4 +85,3 @@ Show one unresolved question: which business key defines payment idempotency acr
 - Do not claim current rules support every language.
 - Do not call model-generated prose evidence.
 - Do not hide that demo defects are seeded.
-

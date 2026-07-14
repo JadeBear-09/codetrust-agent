@@ -68,6 +68,22 @@ class AgentEvent:
     detail: str
 
 
+@dataclass(frozen=True)
+class ImpactArea:
+    name: str
+    kind: str
+    risk: str
+    paths: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class AdversarialTest:
+    rule_id: str
+    name: str
+    rationale: str
+    code: str
+
+
 @dataclass
 class VerificationReport:
     run_id: str
@@ -81,6 +97,9 @@ class VerificationReport:
     checks: list[str] = field(default_factory=list)
     unresolved_questions: list[str] = field(default_factory=list)
     timeline: list[AgentEvent] = field(default_factory=list)
+    impact_areas: list[ImpactArea] = field(default_factory=list)
+    adversarial_tests: list[AdversarialTest] = field(default_factory=list)
+    source: dict[str, str] = field(default_factory=dict)
     model_used: str | None = None
     evidence_hash: str = ""
 
@@ -97,6 +116,9 @@ class VerificationReport:
             "checks": self.checks,
             "unresolved_questions": self.unresolved_questions,
             "timeline": [asdict(event) for event in self.timeline],
+            "impact_areas": [asdict(area) for area in self.impact_areas],
+            "adversarial_tests": [asdict(test) for test in self.adversarial_tests],
+            "source": self.source,
             "model_used": self.model_used,
             "evidence_hash": self.evidence_hash,
         }

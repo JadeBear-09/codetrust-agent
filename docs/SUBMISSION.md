@@ -14,7 +14,7 @@ AI coding agents scale code output, but trust does not scale with it. Senior eng
 
 ## Solution
 
-CodeTrust acts as a verification firewall between coding agents and production. It reconstructs ticket intent, maps changed surfaces, selects risk-specific checks, challenges unsafe assumptions, and produces an evidence pack. Deterministic gates own factual findings; model reasoning explains intent and uncertainty. Humans receive only unresolved business decisions.
+CodeTrust acts as a verification firewall between coding agents and production. It ingests a real GitHub pull request, reconstructs ticket intent, maps affected business domains, selects risk-specific checks, challenges unsafe assumptions, generates adversarial tests, and produces an evidence pack. Deterministic gates own factual findings; model reasoning explains intent and uncertainty. Humans receive only unresolved business decisions.
 
 ## Demo scenario
 
@@ -26,13 +26,14 @@ An agent adds asynchronous payment reconciliation. Code looks correct and a succ
 - Evidence before explanation.
 - Exact file and line references for each risk.
 - Hybrid deterministic and model architecture.
-- Offline-resilient demonstration.
+- Executable failure proof: timeout-after-success produces two payment side effects.
+- Offline-resilient demonstration and local-first dashboard.
 - Explicit human boundary for business judgment.
 - Machine-readable result suitable for CI and policy gates.
 
 ## Technical architecture
 
-CodeTrust accepts ticket text plus a unified diff or git range. A scope mapper extracts changed lines. A router selects async, payment, API, database, and test gates. Findings drive a deterministic risk score and verdict. OpenAI Responses API reconstructs intent and unresolved questions. CodeTrust emits HTML, Markdown, and integrity-hashed JSON artifacts.
+CodeTrust accepts ticket text plus a unified diff, git range, or GitHub pull request. A scope mapper extracts changed lines. An impact mapper identifies business and technical blast radius. A router selects async, payment, API, database, and test gates. A test designer creates missing adversarial proof. Findings drive deterministic risk score and verdict. OpenAI Responses API reconstructs intent and unresolved questions. FastAPI serves dashboard and API; CodeTrust emits HTML, Markdown, generated tests, and integrity-hashed JSON artifacts.
 
 ## Responsible AI
 
@@ -41,14 +42,24 @@ CodeTrust does not silently merge or deploy. It treats tickets and code as untru
 ## Current status
 
 - Working CLI and visual evidence dashboard.
+- Live FastAPI service and OpenAPI documentation.
+- Real GitHub pull-request ingestion.
+- Business-domain impact mapping.
+- Generated adversarial proof templates.
+- Executable duplicate-payment failure proof.
 - Five verification gates.
 - Offline and API-assisted modes.
-- Automated test and lint workflow.
+- Twelve automated tests plus lint and GitHub CI.
+- Non-root Docker packaging and health check.
 - Seeded payment demo detecting all five target failures.
 
 ## Roadmap
 
-Next steps are GitHub App ingestion, dependency-impact mapping, isolated test execution, adversarial test generation, and pre-fix versus post-fix evidence comparison.
+Next steps are GitHub App installation flow, call-graph impact mapping, isolated target-repository test execution, repository-adapted test patches, and pre-fix versus post-fix evidence comparison.
+
+## Event-specific note
+
+DTDL will issue a new problem statement to finalists at the July 24–25 build event. This draft must be adapted to that problem. CodeTrust components remain reusable even if final product changes.
 
 ## Closing
 

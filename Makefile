@@ -1,4 +1,4 @@
-.PHONY: install test lint demo demo-offline clean
+.PHONY: install test lint demo demo-offline proof serve clean
 
 install:
 	uv sync --extra dev
@@ -15,6 +15,11 @@ demo:
 demo-offline:
 	uv run codetrust verify --offline --ticket demo/tickets/payment-reconciliation.md --diff demo/patches/risky-payment.diff --output-dir reports
 
+proof:
+	uv run python scripts/prove_demo.py
+
+serve:
+	uv run codetrust serve
+
 clean:
 	rm -f reports/*.json reports/*.md reports/*.html
-

@@ -6,16 +6,33 @@ import uuid
 from datetime import UTC, datetime
 
 from codetrust.diff_parser import parse_unified_diff
+from codetrust.impact import map_impact
 from codetrust.llm import synthesize
 from codetrust.models import AgentEvent, Severity, Verdict, VerificationReport
 from codetrust.rules import risk_score, run_rules
+from codetrust.testgen import generate_adversarial_tests
 
 
-def verify_change(ticket: str, diff: str, *, offline: bool = False) -> VerificationReport:
+def verify_change(
+    ticket: str,
+    diff: str,
+    *,
+    offline: bool = False,
+    source: dict[str, str] | None = None,
+) -> VerificationReport:
     timeline: list[AgentEvent] = []
 
     files = parse_unified_diff(diff)
     timeline.append(AgentEvent("scope", "complete", f"Mapped {len(files)} changed file(s)."))
+
+    impact_areas = map_impact(files)
+    timeline.append(
+        AgentEvent(
+            "impact-map",
+            "complete",
+            f"Identified {len(impact_areas)} affected domain(s).",
+        )
+    )
 
     findings, checks = run_rules(files)
     timeline.append(
@@ -34,6 +51,15 @@ def verify_change(ticket: str, diff: str, *, offline: bool = False) -> Verificat
             "Used model synthesis."
             if synthesis.model
             else "Used deterministic offline reconstruction.",
+        )
+    )
+
+    adversarial_tests = generate_adversarial_tests(findings)
+    timeline.append(
+        AgentEvent(
+            "test-design",
+            "complete",
+            f"Generated {len(adversarial_tests)} adversarial test(s).",
         )
     )
 
@@ -63,6 +89,9 @@ def verify_change(ticket: str, diff: str, *, offline: bool = False) -> Verificat
         checks=checks,
         unresolved_questions=synthesis.unresolved_questions,
         timeline=timeline,
+        impact_areas=impact_areas,
+        adversarial_tests=adversarial_tests,
+        source=source or {"type": "diff"},
         model_used=synthesis.model,
         evidence_hash=evidence_hash,
     )

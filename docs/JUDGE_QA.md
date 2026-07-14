@@ -2,7 +2,7 @@
 
 ## “Is this only static analysis with an LLM wrapper?”
 
-The baseline uses deterministic rules because evidence must be repeatable. Agent behavior appears in autonomous scope mapping, risk routing, intent reconstruction, challenge selection, uncertainty handling, and verdict packaging. Next iteration adds executable adversarial tests and a verify-fix-rerun loop. The model never gets authority to invent evidence.
+The baseline uses deterministic rules because evidence must be repeatable. Agent behavior appears in autonomous PR ingestion, scope mapping, impact routing, intent reconstruction, challenge selection, adversarial test design, uncertainty handling, and verdict packaging. One adversarial test executes against the demo and proves duplicate payment. The model never gets authority to invent evidence.
 
 ## “Why will existing linters not solve this?”
 
@@ -24,6 +24,18 @@ Core workflow stays constant; policy bundles vary by language, service, and doma
 
 Tickets are incomplete and architectural intent spans many artifacts. Model reasoning helps reconstruct intent, choose useful challenges, and explain residual uncertainty. Deterministic tools remain source of proof.
 
+## “Why did you not use LangGraph?”
+
+Current workflow is short, deterministic, and requires no durable checkpoint or human interrupt. Introducing framework machinery would not improve proof. Stages have typed boundaries and map directly to future LangGraph nodes when conditional retries, parallel specialists, or resumable runs become necessary.
+
+## “Can it analyze a real pull request?”
+
+Yes. `--github-pr OWNER/REPO#NUMBER` uses authenticated GitHub CLI to fetch title, description, commit identities, and unified diff. It never checks out or executes untrusted PR code in current POC.
+
+## “What proof is executable?”
+
+`make proof` runs timeout-after-success scenario. Provider commits first payment side effect, response is lost, retry commits second. Test fails at `assert 2 == 1`. Harness treats this expected failure as confirmed evidence.
+
 ## “What is the business value?”
 
 CodeTrust reduces senior-review load, catches expensive failures earlier, and enables coding-agent throughput without proportionally increasing risk. Production evaluation would measure review time saved, escaped defects, finding precision, and time to remediation.
@@ -41,9 +53,12 @@ The scenario reflects distributed systems, multiple market adapters, backward co
 Use this map:
 
 - `diff_parser.py`: converts unified diff text into typed changed-line evidence.
+- `github.py`: loads real PR metadata and diff through fixed GitHub CLI calls.
+- `impact.py`: maps affected business and technical surfaces.
 - `rules.py`: five independent verification gates plus transparent scoring.
+- `testgen.py`: generates missing adversarial proof templates.
 - `llm.py`: bounded Responses API synthesis with offline fallback.
 - `agent.py`: orchestration, trace, verdict, and evidence hash.
 - `report.py`: JSON, Markdown, and escaped HTML evidence artifacts.
 - `cli.py`: fixed local interface and constrained `git diff` tool.
-
+- `web.py`: FastAPI endpoints and responsive local dashboard.
