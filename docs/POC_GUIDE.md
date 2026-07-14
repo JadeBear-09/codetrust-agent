@@ -22,6 +22,11 @@ make serve
 
 Open `http://127.0.0.1:8787`, load demo, then run verification. Keep `make demo-offline` and generated HTML ready as fallback.
 
+For strongest live demo, use **GitHub PR** tab with:
+
+- `JadeBear-09/codetrust-agent#2` — risky candidate.
+- `JadeBear-09/codetrust-agent#3` — remediated candidate.
+
 ### 1:30–3:10 — Evidence
 
 Lead with `BLOCK 100/100`. Open these findings in order:
@@ -46,11 +51,15 @@ make proof
 
 Point to `assert 2 == 1`: one timeout caused two provider-side payment effects.
 
-### 4:00–4:35 — Human boundary
+### 4:00–4:30 — Remediation comparison
+
+Analyze PR `#3`. Show risk changing from `BLOCK 94/100` to `PASS 0/100` while critical impact areas remain visible. Explain that impact is not failure; missing proof creates failure.
+
+### 4:30–4:45 — Human boundary
 
 Show one unresolved question: which business key defines payment idempotency across markets? Explain that CodeTrust automates proof collection but preserves business ownership.
 
-### 4:35–5:00 — Close
+### 4:45–5:00 — Close
 
 “CodeTrust lets engineering agents scale without turning senior engineers into full-time AI code inspectors.”
 
