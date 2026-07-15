@@ -72,3 +72,52 @@ def test_accepts_github_pull_request_url(monkeypatch: pytest.MonkeyPatch) -> Non
 
     assert change.repo == "acme/payments"
     assert change.number == 7
+
+
+def test_loads_policy_from_exact_base_revision(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = []
+
+    def fake_run(arguments: list[str]) -> str:
+        calls.append(arguments)
+        if ".codetrust/policy.md" in arguments[3]:
+            raise RuntimeError("gh: Not Found (HTTP 404)")
+        return "## Outcome\n- Protect customers.\n"
+
+    monkeypatch.setattr(github, "_run_gh", fake_run)
+
+    policy = github.load_repository_policy("acme/payments", "abcdef1234567")
+
+    assert policy is not None
+    assert policy.path == "CODETRUST.md"
+    assert policy.content.startswith("## Outcome")
+    assert "ref=abcdef1234567" in calls[-1]
+
+
+def test_missing_repository_policy_returns_none(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        github,
+        "_run_gh",
+        lambda _arguments: (_ for _ in ()).throw(RuntimeError("gh: Not Found (HTTP 404)")),
+    )
+
+    assert github.load_repository_policy("acme/payments", "abcdef1234567") is None
+
+
+def test_repository_policy_path_is_configurable_and_safe(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CODETRUST_POLICY_PATHS", "engineering/approved-intent.md")
+    captured = []
+    monkeypatch.setattr(
+        github,
+        "_run_gh",
+        lambda arguments: captured.append(arguments) or "## Outcome\n- Safe change.\n",
+    )
+
+    policy = github.load_repository_policy("acme/payments", "abcdef1234567")
+
+    assert policy is not None
+    assert policy.path == "engineering/approved-intent.md"
+    assert "repos/acme/payments/contents/engineering/approved-intent.md" in captured[0]
+
+    monkeypatch.setenv("CODETRUST_POLICY_PATHS", "../secret.md")
+    with pytest.raises(ValueError, match="Unsafe repository policy path"):
+        github.repository_policy_paths()

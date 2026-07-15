@@ -44,7 +44,7 @@ Paste this into **GitHub pull request**:
 https://github.com/Gnucash/gnucash/pull/2262
 ```
 
-Paste this into **Approved intent**:
+Open **Advanced: provide approved intent**, then paste:
 
 ```markdown
 # GnuCash appearance policy
@@ -63,7 +63,7 @@ Preserve appearance configuration through the supported GTK3 theme system.
 - Users configure appearance through GTK3 themes, not application settings.
 ```
 
-Keep **Use configured model for synthesis** checked. Select **Verify pull request**.
+Select **Verify pull request**. Website always requires configured model synthesis.
 
 ### Expected result
 
@@ -71,7 +71,7 @@ Keep **Use configured model for synthesis** checked. Select **Verify pull reques
 - Risk score: `100/100`
 - Changed files: `14`
 - Scope drift: `50%`
-- Evidence-backed findings: `8`
+- Evidence-backed findings: `9`
 
 Then open maintainer decision. PR is closed without merge. Maintainer says change is out of scope and appearance should use a GTK3 theme.
 
@@ -96,7 +96,21 @@ Paste this into **GitHub pull request**:
 https://github.com/JadeBear-09/codetrust-agent/pull/2
 ```
 
-Leave **Approved intent** blank. CodeTrust uses PR title and description. Keep model checkbox checked. Select **Verify pull request**.
+Open **Advanced: provide approved intent** and paste the ticket section below. CodeTrust never treats PR-author text as approved intent.
+
+```markdown
+## Outcome
+- Add asynchronous payment reconciliation within the settlement window.
+
+## Acceptance criteria
+- Retry transient provider timeouts up to three times.
+- Never charge or reconcile one payment more than once.
+- Keep async workers responsive under concurrent load.
+- Support safe schema rollback without losing in-flight payment state.
+- Test success, timeout-after-success, duplicate delivery, concurrency, and rollback.
+```
+
+Select **Verify pull request**.
 
 ### Expected result
 
@@ -114,7 +128,7 @@ Main findings:
 
 ### Narration
 
-> This second PR is from my private CodeTrust repository. CodeTrust uses its real PR description as intent, fetches the live diff, and returns BLOCK 94 out of 100. It shows exact file and line evidence, business impact, and suggested verification. Model explains findings, but deterministic gates control the verdict.
+> This second PR is from my private CodeTrust repository. I provide approved acceptance criteria, then CodeTrust fetches the live diff and blocks the risky implementation. It shows exact file and line evidence, business impact, and suggested verification. Model explains findings, but deterministic gates control the verdict.
 
 ## Close the private test PR after recording
 

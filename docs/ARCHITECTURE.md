@@ -13,7 +13,7 @@ Models are strong at reconstructing intent and explaining tradeoffs. Determinist
 5. **Route:** select risk gates based on file types and code signals.
 6. **Challenge:** run deterministic checks and create structured findings.
 7. **Design proof:** generate adversarial test templates for highest risks.
-8. **Synthesize:** use Responses API to summarize intent and open questions; fall back offline.
+8. **Synthesize:** use the configured model to summarize intent and open questions; fail explicitly if required synthesis cannot complete.
 9. **Decide:** calculate risk score and verdict from findings, not model opinion.
 10. **Package:** write integrity-hashed JSON, Markdown, test, and visual reports.
 
@@ -39,9 +39,9 @@ Models are strong at reconstructing intent and explaining tradeoffs. Determinist
 
 - `BLOCK`: any critical finding or score at least 70.
 - `NEEDS_REVIEW`: any high finding or score at least 35.
-- `PASS`: no configured blocking signal.
+- `PASS`: structured intent exists, at least one gate applies, and no finding exists.
 
-`PASS` is intentionally scoped. It means configured checks found no blocker, not that a change is universally safe.
+`PASS` is intentionally scoped. Unsupported or uncovered changes route to `NEEDS_REVIEW`, never PASS.
 
 ## Evidence integrity
 

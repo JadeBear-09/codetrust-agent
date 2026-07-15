@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import time
 import uuid
 from datetime import UTC, datetime
 
@@ -12,6 +13,7 @@ from codetrust.models import (
     AgentEvent,
     InterpretationClaim,
     Severity,
+    SynthesisStatus,
     Verdict,
     VerificationReport,
 )
@@ -28,6 +30,7 @@ def verify_change(
     source: dict[str, str] | None = None,
     interpretations: list[InterpretationClaim] | None = None,
 ) -> VerificationReport:
+    started = time.monotonic()
     timeline: list[AgentEvent] = []
 
     files = parse_unified_diff(diff)
@@ -51,14 +54,17 @@ def verify_change(
         )
     )
 
-    technical_findings, checks = run_rules(files)
+    technical_findings, applicable_checks, skipped_checks = run_rules(files)
     findings = [*scope.findings, *technical_findings]
-    checks = ["scope-alignment", *checks]
+    checks = ["scope-alignment", *applicable_checks]
     timeline.append(
         AgentEvent(
             "challenge",
             "complete",
-            f"Ran {len(checks)} targeted gate(s); produced {len(findings)} finding(s).",
+            (
+                f"Ran {len(applicable_checks)} applicable gate(s); "
+                f"skipped {len(skipped_checks)}; produced {len(findings)} finding(s)."
+            ),
         )
     )
 
@@ -67,9 +73,7 @@ def verify_change(
         AgentEvent(
             "reconstruct-intent",
             "complete",
-            "Used model synthesis."
-            if synthesis.model
-            else "Used deterministic offline reconstruction.",
+            "Used model synthesis." if synthesis.model else "Model synthesis explicitly disabled.",
         )
     )
 
@@ -83,7 +87,15 @@ def verify_change(
     )
 
     score = risk_score(findings)
-    verdict = _verdict(findings, score)
+    intent_is_structured = any(
+        (
+            scope.snapshot.outcome,
+            scope.snapshot.in_scope,
+            scope.snapshot.out_of_scope,
+            scope.snapshot.acceptance_criteria,
+        )
+    )
+    verdict = _verdict(findings, score, intent_is_structured, applicable_checks)
     timeline.append(
         AgentEvent("decision", "complete", f"Verdict {verdict.value}; score {score}/100.")
     )
@@ -109,6 +121,13 @@ def verify_change(
                 {"role": item.role, "text": item.text, "source": item.source}
                 for item in interpretations or []
             ],
+            "model_used": synthesis.model,
+            "synthesis_status": synthesis.status,
+            "synthesis_attempts": synthesis.attempts,
+            "synthesis_duration_ms": synthesis.duration_ms,
+            "synthesis_input_truncated": synthesis.input_truncated,
+            "applicable_checks": applicable_checks,
+            "skipped_checks": skipped_checks,
         },
         sort_keys=True,
     )
@@ -130,20 +149,39 @@ def verify_change(
         adversarial_tests=adversarial_tests,
         source=source or {"type": "diff"},
         model_used=synthesis.model,
+        synthesis_status=SynthesisStatus(synthesis.status),
+        synthesis_attempts=synthesis.attempts,
+        synthesis_duration_ms=synthesis.duration_ms,
+        synthesis_input_truncated=synthesis.input_truncated,
+        duration_ms=round((time.monotonic() - started) * 1000),
         evidence_hash=evidence_hash,
         intent_snapshot=scope.snapshot,
         interpretations=interpretations or [],
         alignments=scope.alignments,
         scope_coverage=scope.coverage,
         scope_drift=scope.drift,
+        applicable_checks=applicable_checks,
+        skipped_checks=skipped_checks,
+        gate_coverage=(
+            round(len(applicable_checks) / (len(applicable_checks) + len(skipped_checks)) * 100)
+            if applicable_checks or skipped_checks
+            else 0
+        ),
     )
 
 
-def _verdict(findings, score: int) -> Verdict:
+def _verdict(
+    findings,
+    score: int,
+    intent_is_structured: bool,
+    applicable_checks: list[str],
+) -> Verdict:
     if any(item.rule_id == "CT-SCOPE-001" for item in findings):
         return Verdict.BLOCK
     if any(item.severity is Severity.CRITICAL for item in findings) or score >= 70:
         return Verdict.BLOCK
     if any(item.severity is Severity.HIGH for item in findings) or score >= 35:
+        return Verdict.NEEDS_REVIEW
+    if findings or not intent_is_structured or not applicable_checks:
         return Verdict.NEEDS_REVIEW
     return Verdict.PASS

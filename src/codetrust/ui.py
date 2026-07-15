@@ -4,599 +4,312 @@ DASHBOARD_HTML = r"""<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="CodeTrust evidence-first pull-request verification">
-  <title>CodeTrust · Verify pull requests</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="CodeTrust pull-request verification">
+  <title>CodeTrust</title>
   <style>
     :root {
-      --ink:#eef2ef;
-      --muted:#8c9991;
-      --dim:#69736d;
-      --bg:#090b0a;
-      --panel:#101411;
-      --panel-2:#151a17;
-      --line:#252c28;
-      --green:#8af5b2;
-      --green-deep:#163622;
-      --red:#ff7b7b;
-      --red-deep:#361919;
-      --amber:#ffc66d;
-      --amber-deep:#382b16;
-      --blue:#8db8ff;
-      --shadow:0 24px 80px rgba(0,0,0,.35);
+      color-scheme: dark;
+      --bg:#080b09; --panel:#111612; --panel-2:#0d110e; --line:#263128;
+      --text:#f4f7f4; --muted:#9ba79d; --green:#78e7a2; --red:#ff7d7d;
+      --amber:#ffd166; --shadow:0 18px 55px #0007;
     }
-    * { box-sizing:border-box; }
-    [hidden] { display:none !important; }
-    html { color-scheme:dark; scroll-behavior:smooth; }
-    body {
-      margin:0;
-      min-height:100vh;
-      color:var(--ink);
-      background:
-        radial-gradient(circle at 80% -10%,rgba(64,125,86,.14),transparent 28rem),
-        radial-gradient(circle at -10% 55%,rgba(82,101,91,.08),transparent 24rem),
-        var(--bg);
-      font:14px/1.5 Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-    }
-    button,input,textarea { font:inherit; }
-    button,a { -webkit-tap-highlight-color:transparent; }
-    button { color:inherit; }
-    a { color:inherit; }
-    .app { min-height:100vh; display:grid; grid-template-columns:264px minmax(0,1fr); }
-    .rail {
-      position:sticky;
-      top:0;
-      height:100vh;
-      padding:28px 20px;
-      border-right:1px solid var(--line);
-      background:rgba(10,12,11,.86);
-      backdrop-filter:blur(18px);
-      display:flex;
-      flex-direction:column;
-      z-index:5;
-    }
-    .brand { display:flex; align-items:center; gap:11px; font-weight:850; letter-spacing:-.02em; font-size:17px; }
-    .mark {
-      width:34px;
-      height:34px;
-      display:grid;
-      place-items:center;
-      color:#09100b;
-      background:var(--green);
-      border-radius:10px;
-      font-weight:950;
-      box-shadow:0 0 30px rgba(138,245,178,.13);
-    }
-    .rail-copy { margin:34px 0 18px; color:var(--dim); font-size:11px; text-transform:uppercase; letter-spacing:.14em; font-weight:800; }
-    .nav-button {
-      width:100%;
-      border:1px solid transparent;
-      background:transparent;
-      padding:11px 12px;
-      border-radius:10px;
-      text-align:left;
-      cursor:pointer;
-      color:var(--muted);
-      display:flex;
-      align-items:center;
-      gap:10px;
-    }
-    .nav-button.active { color:var(--ink); border-color:var(--line); background:var(--panel-2); }
-    .nav-dot { width:7px; height:7px; border-radius:50%; background:currentColor; }
-    .history { margin-top:8px; overflow:auto; min-height:0; }
-    .history-empty { color:var(--dim); padding:12px; font-size:12px; }
-    .history-item {
-      width:100%;
-      padding:11px 12px;
-      margin:0 0 6px;
-      border:1px solid transparent;
-      border-radius:10px;
-      background:transparent;
-      text-align:left;
-      cursor:pointer;
-    }
-    .history-item:hover,.history-item:focus-visible { border-color:var(--line); background:var(--panel); outline:none; }
-    .history-item strong { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; }
-    .history-meta { display:flex; justify-content:space-between; gap:8px; color:var(--dim); font-size:10px; margin-top:4px; text-transform:uppercase; letter-spacing:.06em; }
-    .history-verdict.PASS { color:var(--green); }
-    .history-verdict.BLOCK { color:var(--red); }
-    .history-verdict.NEEDS_REVIEW { color:var(--amber); }
-    .rail-foot { margin-top:auto; padding-top:20px; border-top:1px solid var(--line); }
-    .service-status { display:flex; align-items:flex-start; gap:9px; color:var(--muted); font-size:12px; }
-    .status-light { width:8px; height:8px; flex:0 0 auto; margin-top:5px; border-radius:50%; background:var(--dim); }
-    .status-light.ready { background:var(--green); box-shadow:0 0 14px rgba(138,245,178,.5); }
-    .status-light.warn { background:var(--amber); }
-    .main { min-width:0; }
-    .topbar {
-      height:72px;
-      padding:0 clamp(22px,4vw,58px);
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      border-bottom:1px solid var(--line);
-      background:rgba(9,11,10,.62);
-      backdrop-filter:blur(18px);
-    }
-    .top-title { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.14em; font-weight:800; }
-    .top-links { display:flex; gap:8px; }
-    .button,.link-button {
-      min-height:40px;
-      border:1px solid var(--line);
-      background:var(--panel-2);
-      border-radius:10px;
-      padding:9px 14px;
-      font-weight:750;
-      cursor:pointer;
-      text-decoration:none;
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      gap:8px;
-    }
-    .button:hover,.link-button:hover { border-color:#3c4740; transform:translateY(-1px); }
-    .button.primary { border-color:var(--green); background:var(--green); color:#09110c; box-shadow:0 8px 30px rgba(138,245,178,.12); }
-    .button.primary:disabled { opacity:.55; cursor:wait; transform:none; }
-    .button.ghost { background:transparent; color:var(--muted); }
-    .content { width:min(1220px,calc(100% - 44px)); margin:0 auto; padding:58px 0 96px; }
-    .hero { display:grid; grid-template-columns:minmax(0,1.05fr) minmax(360px,.95fr); gap:clamp(30px,6vw,84px); align-items:center; }
-    .eyebrow { color:var(--green); text-transform:uppercase; letter-spacing:.16em; font-size:11px; font-weight:850; }
-    h1 { margin:18px 0 20px; max-width:12ch; font-size:clamp(46px,6vw,78px); line-height:.96; letter-spacing:-.065em; font-weight:870; }
-    .lead { max-width:58ch; color:#aab5ae; font-size:17px; line-height:1.65; }
-    .principles { display:flex; flex-wrap:wrap; gap:8px; margin-top:28px; }
-    .principle { padding:8px 11px; border:1px solid var(--line); border-radius:99px; color:var(--muted); font-size:11px; }
-    .panel { border:1px solid var(--line); background:linear-gradient(150deg,rgba(20,25,22,.98),rgba(13,16,14,.98)); border-radius:18px; box-shadow:var(--shadow); }
-    .verify-card { padding:26px; }
-    .card-head { display:flex; align-items:start; justify-content:space-between; gap:18px; margin-bottom:22px; }
-    .card-head h2 { margin:0 0 4px; font-size:20px; letter-spacing:-.03em; }
-    .card-head p { margin:0; color:var(--muted); font-size:12px; }
-    .mode-pill { padding:7px 9px; border:1px solid var(--line); border-radius:99px; color:var(--green); font-size:10px; text-transform:uppercase; letter-spacing:.08em; font-weight:850; white-space:nowrap; }
-    label.field-label { display:block; color:#b6c0ba; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.1em; margin:17px 0 8px; }
-    .hint { color:var(--dim); font-size:11px; font-weight:500; text-transform:none; letter-spacing:0; float:right; }
-    input[type="url"],input[type="text"],textarea {
-      width:100%;
-      border:1px solid var(--line);
-      background:#0b0e0c;
-      color:var(--ink);
-      border-radius:11px;
-      padding:13px 14px;
-      outline:none;
-    }
-    input:focus,textarea:focus { border-color:#60806b; box-shadow:0 0 0 3px rgba(138,245,178,.06); }
-    textarea { min-height:136px; resize:vertical; line-height:1.55; }
-    ::placeholder { color:#505953; }
-    .options { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:16px; }
-    .check { display:flex; align-items:center; gap:9px; color:var(--muted); cursor:pointer; user-select:none; }
-    .check input { accent-color:var(--green); width:16px; height:16px; }
-    .form-actions { display:flex; gap:9px; margin-top:20px; }
-    .form-actions .primary { flex:1; }
-    .error { display:none; margin-top:14px; border:1px solid #593232; background:#261414; color:#ffaaaa; padding:11px 13px; border-radius:10px; font-size:12px; white-space:pre-wrap; }
-    .running { display:none; margin-top:14px; color:var(--muted); font-size:12px; }
-    .running.show { display:flex; align-items:center; gap:10px; }
-    .spinner { width:15px; height:15px; border-radius:50%; border:2px solid var(--line); border-top-color:var(--green); animation:spin .8s linear infinite; }
-    @keyframes spin { to { transform:rotate(360deg); } }
-    .results { display:none; margin-top:68px; }
-    .results.show { display:block; }
-    .result-banner { padding:28px; display:grid; grid-template-columns:minmax(0,1fr) auto; gap:28px; align-items:center; }
-    .verdict-line { display:flex; align-items:center; gap:12px; margin-bottom:12px; }
-    .verdict {
-      display:inline-flex;
-      align-items:center;
-      padding:6px 9px;
-      border-radius:7px;
-      font-weight:900;
-      font-size:12px;
-      letter-spacing:.08em;
-    }
-    .verdict.PASS { background:var(--green-deep); color:var(--green); }
-    .verdict.BLOCK { background:var(--red-deep); color:var(--red); }
-    .verdict.NEEDS_REVIEW { background:var(--amber-deep); color:var(--amber); }
-    .run-id { color:var(--dim); font:11px ui-monospace,SFMono-Regular,Menlo,monospace; }
-    .result-banner h2 { margin:0; font-size:clamp(24px,3vw,38px); letter-spacing:-.045em; line-height:1.08; }
-    .summary-copy { color:var(--muted); max-width:72ch; margin:13px 0 0; }
-    .score { text-align:right; min-width:140px; }
-    .score strong { display:block; font-size:62px; line-height:.9; letter-spacing:-.07em; }
-    .score span { color:var(--dim); text-transform:uppercase; letter-spacing:.1em; font-size:10px; font-weight:800; }
-    .metrics { display:grid; grid-template-columns:repeat(4,1fr); gap:1px; border-top:1px solid var(--line); background:var(--line); }
-    .metric { background:var(--panel); padding:18px 24px; }
-    .metric strong { display:block; font-size:17px; }
-    .metric span { color:var(--dim); text-transform:uppercase; letter-spacing:.09em; font-size:9px; font-weight:800; }
-    .source-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:18px; }
-    .source-actions .link-button { min-height:34px; padding:7px 11px; font-size:11px; }
-    .section { margin-top:42px; }
-    .section-title { display:flex; align-items:end; justify-content:space-between; gap:16px; margin-bottom:14px; }
-    .section-title h3 { margin:0; font-size:20px; letter-spacing:-.03em; }
-    .section-title p { margin:0; color:var(--dim); font-size:11px; }
-    .decision-list { display:grid; gap:8px; }
-    .decision { padding:16px 18px; border-left:3px solid var(--amber); }
-    .decision p { margin:0; color:#d7d0c2; }
-    .findings { display:grid; gap:12px; min-width:0; }
-    .finding { padding:22px; box-shadow:none; min-width:0; }
-    .finding-top { display:flex; justify-content:space-between; gap:16px; align-items:flex-start; }
-    .finding-top > div { min-width:0; }
-    .finding-title { margin:7px 0 0; font-size:18px; letter-spacing:-.02em; }
-    .rule { color:var(--blue); font:11px ui-monospace,SFMono-Regular,Menlo,monospace; }
-    .severity { padding:5px 8px; border-radius:6px; font-size:9px; letter-spacing:.1em; font-weight:900; text-transform:uppercase; }
-    .severity.critical,.severity.high { background:var(--red-deep); color:var(--red); }
-    .severity.medium { background:var(--amber-deep); color:var(--amber); }
-    .severity.low { background:var(--green-deep); color:var(--green); }
-    .location { margin-top:15px; color:var(--muted); overflow-wrap:anywhere; font:11px ui-monospace,SFMono-Regular,Menlo,monospace; }
-    .evidence { max-width:100%; margin:8px 0 0; padding:13px; border:1px solid var(--line); background:#090c0a; border-radius:9px; color:#c5cec8; white-space:pre-wrap; overflow-wrap:anywhere; overflow-x:auto; font:11px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace; }
-    .finding-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:17px; }
-    .finding-block span { display:block; margin-bottom:5px; color:var(--dim); font-size:9px; text-transform:uppercase; letter-spacing:.1em; font-weight:850; }
-    .finding-block p { margin:0; color:#aeb8b2; }
-    .proof { border-color:#33453a; background:rgba(22,54,34,.35); padding:12px; border-radius:9px; }
-    .two-col { display:grid; grid-template-columns:1.15fr .85fr; gap:14px; }
-    .compact-panel { padding:20px; box-shadow:none; }
-    .timeline { display:grid; gap:0; }
-    .timeline-item { position:relative; padding:0 0 17px 24px; color:var(--muted); }
-    .timeline-item:last-child { padding-bottom:0; }
-    .timeline-item::before { content:""; position:absolute; left:5px; top:7px; bottom:-4px; border-left:1px solid var(--line); }
-    .timeline-item:last-child::before { display:none; }
-    .timeline-item::after { content:""; position:absolute; left:1px; top:5px; width:9px; height:9px; border-radius:50%; background:var(--green); box-shadow:0 0 0 3px var(--green-deep); }
-    .timeline-item strong { display:block; color:var(--ink); text-transform:capitalize; font-size:12px; }
-    .timeline-item span { font-size:11px; }
-    .impact-list { display:flex; flex-wrap:wrap; gap:8px; }
-    .impact-chip { border:1px solid var(--line); padding:9px 11px; border-radius:9px; color:var(--muted); }
-    .impact-chip strong { color:var(--ink); }
-    .alignment-list { display:grid; gap:8px; }
-    .alignment { padding:13px; border:1px solid var(--line); border-radius:9px; }
-    .alignment strong { display:block; margin-bottom:4px; }
-    .alignment p { margin:0; color:var(--muted); font-size:12px; }
-    .alignment-status { color:var(--green); text-transform:uppercase; letter-spacing:.08em; font-size:9px; }
-    .alignment-status.contradicted { color:var(--red); }
-    .alignment-status.ambiguous { color:var(--amber); }
-    .empty-findings { padding:24px; color:var(--muted); text-align:center; }
-    .footer { margin-top:56px; padding-top:20px; border-top:1px solid var(--line); display:flex; justify-content:space-between; gap:20px; color:var(--dim); font-size:11px; }
-    .mobile-brand { display:none; }
-    @media(max-width:980px) {
-      .app { grid-template-columns:1fr; }
-      .rail { display:none; }
-      .mobile-brand { display:flex; align-items:center; gap:9px; font-weight:850; }
-      .top-title { display:none; }
-      .content { padding-top:36px; }
-      .hero { grid-template-columns:1fr; }
-      h1 { max-width:14ch; }
-    }
-    @media(max-width:680px) {
-      .topbar { padding:0 16px; }
-      .content { width:min(100% - 28px,1220px); }
-      .hero { gap:30px; }
-      h1 { font-size:44px; }
-      .verify-card { padding:20px; }
-      .result-banner { grid-template-columns:1fr; }
-      .score { text-align:left; }
-      .metrics { grid-template-columns:1fr 1fr; }
-      .finding-grid,.two-col { grid-template-columns:1fr; }
-      .finding { padding:18px; }
-      .footer { flex-direction:column; }
-      .top-links .button { display:none; }
-    }
+    * { box-sizing:border-box }
+    body { margin:0; background:radial-gradient(circle at 50% -20%,#183421 0,transparent 42%),var(--bg); color:var(--text); font:15px/1.55 Inter,ui-sans-serif,system-ui,-apple-system,sans-serif }
+    button,input,textarea { font:inherit }
+    a { color:inherit }
+    .shell { width:min(880px,calc(100% - 32px)); margin:auto; padding:28px 0 70px }
+    header { display:flex; align-items:center; justify-content:space-between; margin-bottom:48px }
+    .brand { font-size:20px; font-weight:900; letter-spacing:-.04em }
+    .brand span { color:var(--green) }
+    .model-status { display:flex; align-items:center; gap:8px; color:var(--muted); font-size:13px }
+    .dot { width:8px; height:8px; border-radius:50%; background:var(--amber); box-shadow:0 0 0 4px #ffd16618 }
+    .dot.ready { background:var(--green); box-shadow:0 0 0 4px #78e7a218 }
+    h1 { margin:0; font-size:clamp(34px,7vw,58px); line-height:1; letter-spacing:-.065em; max-width:700px }
+    .sub { color:var(--muted); font-size:17px; margin:18px 0 28px }
+    .card { background:linear-gradient(145deg,#121814,#0d110e); border:1px solid var(--line); border-radius:20px; box-shadow:var(--shadow) }
+    form { padding:24px }
+    label { display:block; margin-bottom:9px; font-size:12px; color:#cbd4cc; text-transform:uppercase; letter-spacing:.1em; font-weight:800 }
+    input,textarea { width:100%; border:1px solid #303b32; border-radius:12px; color:var(--text); background:#090d0a; outline:none; padding:14px 15px }
+    input:focus,textarea:focus { border-color:var(--green); box-shadow:0 0 0 3px #78e7a214 }
+    input { font-size:16px }
+    textarea { min-height:160px; resize:vertical }
+    details { border-top:1px solid var(--line); margin-top:18px; padding-top:16px }
+    summary { color:var(--muted); cursor:pointer; user-select:none; list-style:none; font-weight:700 }
+    summary::-webkit-details-marker { display:none }
+    summary::after { content:"+"; float:right; color:var(--green) }
+    details[open] summary::after { content:"−" }
+    .advanced-copy { margin:8px 0 12px; color:var(--muted); font-size:13px }
+    .actions { display:flex; gap:12px; margin-top:20px }
+    button { border:0; border-radius:12px; cursor:pointer; font-weight:900 }
+    .primary { flex:1; padding:14px 18px; color:#061109; background:var(--green) }
+    .primary:hover { filter:brightness(1.06) }
+    .primary:disabled { cursor:not-allowed; opacity:.45 }
+    .cancel { padding:14px 16px; color:var(--muted); background:transparent; border:1px solid var(--line) }
+    .running { display:none; align-items:center; gap:10px; margin-top:16px; color:var(--muted); font-size:13px }
+    .running.show { display:flex }
+    .spinner { width:14px; height:14px; border:2px solid #314035; border-top-color:var(--green); border-radius:50%; animation:spin .8s linear infinite }
+    @keyframes spin { to { transform:rotate(360deg) } }
+    .error { display:none; margin-top:18px; padding:16px; border:1px solid #6d3434; border-radius:12px; background:#251313; color:#ffd1d1 }
+    .error.show { display:block }
+    .error strong { display:block; margin-bottom:4px }
+    .principles { display:flex; gap:8px; flex-wrap:wrap; margin-top:14px }
+    .chip { border:1px solid var(--line); border-radius:999px; padding:6px 10px; color:var(--muted); font-size:12px }
+    .result { display:none; margin-top:24px; overflow:hidden }
+    .result.show { display:block }
+    .result-head { display:grid; grid-template-columns:1fr auto; gap:24px; padding:26px }
+    .verdict { display:inline-flex; border-radius:7px; padding:5px 9px; background:#243127; color:var(--green); font-size:12px; font-weight:950; letter-spacing:.1em }
+    .verdict.BLOCK { background:#351a1a; color:var(--red) }
+    .verdict.NEEDS_REVIEW { background:#342d18; color:var(--amber) }
+    .result h2 { margin:12px 0 7px; font-size:27px; line-height:1.15; letter-spacing:-.035em }
+    .summary { color:var(--muted); margin:0; max-width:620px }
+    .score { text-align:right; font-size:48px; line-height:1; font-weight:950; letter-spacing:-.06em }
+    .score small { display:block; margin-top:7px; color:var(--muted); font-size:10px; letter-spacing:.1em; text-transform:uppercase }
+    .meta { display:flex; flex-wrap:wrap; gap:8px; padding:0 26px 24px }
+    .section { margin-top:30px }
+    .section h3 { margin:0 0 12px; font-size:18px; letter-spacing:-.025em }
+    .finding { padding:0; margin:0 0 10px; border-top:1px solid var(--line) }
+    .finding summary { padding:16px 20px; color:var(--text) }
+    .finding summary::after { margin-left:12px }
+    .finding-top { display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:12px; color:var(--muted); font-size:12px }
+    .finding-name { color:var(--text); font-size:14px; font-weight:850 }
+    .finding-body { padding:0 20px 20px }
+    .severity { text-transform:uppercase; font-weight:900; color:var(--amber) }
+    .severity.critical,.severity.high { color:var(--red) }
+    .evidence { margin:0; padding:12px; border-radius:9px; background:#080b09; color:#dce4dd; font:12px/1.5 ui-monospace,SFMono-Regular,monospace; overflow-wrap:anywhere }
+    .finding-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:14px }
+    .finding-grid b { display:block; margin-bottom:4px; color:var(--muted); font-size:10px; text-transform:uppercase; letter-spacing:.1em }
+    .finding-grid p { margin:0 }
+    .empty { padding:20px; color:var(--muted) }
+    .trace { padding:0 22px 20px; margin:0; list-style:none }
+    .trace li { padding:10px 0; border-top:1px solid var(--line); color:var(--muted) }
+    .trace b { color:var(--text); margin-right:8px; text-transform:capitalize }
+    .source-links { display:flex; gap:10px; padding:0 26px 26px }
+    .source-links a { text-decoration:none; border:1px solid var(--line); border-radius:9px; padding:8px 11px; color:var(--muted); font-size:12px }
+    .history { margin-top:30px }
+    .history-list { display:grid; gap:8px; margin-top:12px }
+    .history button { width:100%; display:flex; justify-content:space-between; padding:13px; color:var(--muted); background:var(--panel-2); border:1px solid var(--line); text-align:left }
+    footer { margin-top:44px; color:#667068; font-size:12px; text-align:center }
+    @media(max-width:640px) { header{margin-bottom:34px}.result-head{grid-template-columns:1fr}.score{text-align:left}.finding-grid{grid-template-columns:1fr}.shell{width:min(100% - 20px,880px)}form{padding:18px} }
   </style>
 </head>
 <body>
-  <div class="app">
-    <aside class="rail">
-      <div class="brand"><span class="mark">C</span><span>CodeTrust</span></div>
-      <div class="rail-copy">Workspace</div>
-      <button class="nav-button active" type="button" id="newRun"><span class="nav-dot"></span>New verification</button>
-      <div class="rail-copy">Recent runs</div>
-      <div class="history" id="history"><div class="history-empty">No verification runs yet.</div></div>
-      <div class="rail-foot">
-        <div class="service-status">
-          <span class="status-light" id="modelLight"></span>
-          <span><strong id="modelLabel">Checking model…</strong><br><span id="modelDetail">Backend configuration</span></span>
-        </div>
+  <main class="shell">
+    <header>
+      <div class="brand">Code<span>Trust</span></div>
+      <div class="model-status"><i class="dot" id="modelDot"></i><span id="modelStatus">Checking model…</span></div>
+    </header>
+
+    <h1>Verify pull request.</h1>
+    <p class="sub">Paste URL. Agent reads trusted base policy, live diff, and returns evidence.</p>
+
+    <form class="card" id="verifyForm">
+      <label for="prReference">GitHub pull request</label>
+      <input id="prReference" name="reference" type="url" required autocomplete="url" placeholder="https://github.com/owner/repo/pull/42">
+      <details id="advanced">
+        <summary>Advanced: provide approved intent</summary>
+        <p class="advanced-copy">Use only when repository has no CODETRUST.md on base branch.</p>
+        <textarea id="intent" placeholder="## Outcome&#10;- ...&#10;&#10;## Out of scope&#10;- ...&#10;&#10;## Acceptance criteria&#10;- ..."></textarea>
+      </details>
+      <div class="actions">
+        <button class="primary" id="verifyButton" type="submit">Verify pull request</button>
+        <button class="cancel" id="cancelButton" type="button" hidden>Stop waiting</button>
       </div>
-    </aside>
+      <div class="running" id="running"><i class="spinner"></i><span>Reading policy, diff, gates, and Gemini…</span></div>
+      <div class="error" id="error" role="alert"></div>
+      <div class="principles"><span class="chip">No PR code execution</span><span class="chip">No silent model fallback</span><span class="chip">No repository mutation</span></div>
+    </form>
 
-    <main class="main">
-      <header class="topbar">
-        <div class="mobile-brand"><span class="mark">C</span><span>CodeTrust</span></div>
-        <div class="top-title">Evidence-first pull-request verification</div>
-        <div class="top-links">
-          <a class="link-button" href="/docs" target="_blank" rel="noreferrer">API docs</a>
-          <button class="button ghost" type="button" id="refreshRuns">Refresh</button>
-        </div>
-      </header>
-
-      <div class="content">
-        <section class="hero" id="verify">
-          <div>
-            <div class="eyebrow">Verification firewall</div>
-            <h1>Trust evidence, not confidence.</h1>
-            <p class="lead">Give CodeTrust a real pull request and approved intent. The agent fetches the live diff, maps scope and impact, runs deterministic gates, then routes unresolved risk to a human.</p>
-            <div class="principles">
-              <span class="principle">Never executes PR code</span>
-              <span class="principle">Deterministic verdict</span>
-              <span class="principle">Model-bounded explanation</span>
-            </div>
-          </div>
-
-          <form class="panel verify-card" id="verifyForm">
-            <div class="card-head">
-              <div><h2>Verify pull request</h2><p>GitHub PR must be visible to authenticated GitHub CLI.</p></div>
-              <span class="mode-pill">Live PR</span>
-            </div>
-            <label class="field-label" for="prReference">GitHub pull request</label>
-            <input id="prReference" name="reference" type="text" required autocomplete="url" placeholder="https://github.com/owner/repository/pull/42">
-
-            <label class="field-label" for="intent">Approved intent <span class="hint">Optional · PR description used when blank</span></label>
-            <textarea id="intent" name="intent" placeholder="Outcome, in-scope behavior, out-of-scope boundaries, and acceptance criteria…"></textarea>
-
-            <div class="options">
-              <label class="check" for="useModel"><input id="useModel" type="checkbox" checked>Use configured model for synthesis</label>
-            </div>
-            <div class="form-actions">
-              <button class="button primary" id="verifyButton" type="submit">Verify pull request</button>
-              <button class="button ghost" id="stopButton" type="button" hidden>Stop request</button>
-            </div>
-            <div class="running" id="running"><span class="spinner"></span><span>Fetching live diff and running verification gates…</span></div>
-            <div class="error" id="error" role="alert"></div>
-          </form>
-        </section>
-
-        <section class="results" id="results" aria-live="polite">
-          <div class="panel">
-            <div class="result-banner">
-              <div>
-                <div class="verdict-line"><span class="verdict" id="verdict"></span><span class="run-id" id="runId"></span></div>
-                <h2 id="intentTitle"></h2>
-                <p class="summary-copy" id="summary"></p>
-                <div class="source-actions" id="sourceActions"></div>
-              </div>
-              <div class="score"><strong id="score">0</strong><span>risk score / 100</span></div>
-            </div>
-            <div class="metrics">
-              <div class="metric"><strong id="filesMetric">0</strong><span>files changed</span></div>
-              <div class="metric"><strong id="findingsMetric">0</strong><span>findings</span></div>
-              <div class="metric"><strong id="driftMetric">0%</strong><span>scope drift</span></div>
-              <div class="metric"><strong id="modelMetric">Offline</strong><span>synthesis</span></div>
-            </div>
-          </div>
-
-          <div class="section" id="decisionSection" hidden>
-            <div class="section-title"><h3>Human decisions</h3><p>Automation stops here</p></div>
-            <div class="decision-list" id="decisions"></div>
-          </div>
-
-          <div class="section">
-            <div class="section-title"><h3>Evidence-backed findings</h3><p>File · line · evidence · impact · proof</p></div>
-            <div class="findings" id="findings"></div>
-          </div>
-
-          <div class="section two-col">
-            <div class="panel compact-panel">
-              <div class="section-title"><h3>Verification trace</h3><p>Deterministic workflow</p></div>
-              <div class="timeline" id="timeline"></div>
-            </div>
-            <div class="panel compact-panel">
-              <div class="section-title"><h3>Impact map</h3><p>Affected surfaces</p></div>
-              <div class="impact-list" id="impact"></div>
-            </div>
-          </div>
-
-          <div class="section" id="alignmentSection" hidden>
-            <div class="section-title"><h3>Scope alignment</h3><p>Intent-to-change evidence</p></div>
-            <div class="alignment-list" id="alignments"></div>
-          </div>
-        </section>
-
-        <footer class="footer"><span>CodeTrust verifies changes. It never merges, deploys, or claims proof beyond configured gates.</span><span id="evidenceHash"></span></footer>
+    <section class="card result" id="result" aria-live="polite">
+      <div class="result-head">
+        <div><span class="verdict" id="verdict"></span><h2 id="intentTitle"></h2><p class="summary" id="summary"></p></div>
+        <div class="score"><span id="score"></span><small>risk / 100</small></div>
       </div>
-    </main>
-  </div>
+      <div class="meta" id="meta"></div>
+      <div class="source-links" id="sourceLinks"></div>
+      <details>
+        <summary style="padding:0 26px 16px">Verification details</summary>
+        <ul class="trace" id="trace"></ul>
+      </details>
+    </section>
+
+    <section class="section" id="findingsSection" hidden>
+      <h3>Evidence-backed findings</h3>
+      <div id="findings"></div>
+    </section>
+
+    <details class="history" id="historySection">
+      <summary>Recent runs</summary>
+      <div class="history-list" id="history"></div>
+    </details>
+    <footer>CodeTrust verifies. It never merges, deploys, or changes pull requests.</footer>
+  </main>
 
   <script>
     const byId = id => document.getElementById(id);
-    let activeController = null;
-    let config = null;
+    let controller = null;
+    let modelConfigured = false;
 
-    function textNode(tag, className, value) {
-      const node = document.createElement(tag);
-      if (className) node.className = className;
-      node.textContent = value ?? "";
-      return node;
+    function node(tag, className, text) {
+      const element = document.createElement(tag);
+      if (className) element.className = className;
+      if (text !== undefined) element.textContent = text;
+      return element;
     }
 
-    function showError(message) {
-      const node = byId("error");
-      node.textContent = message;
-      node.style.display = "block";
+    function setRunning(active) {
+      byId("running").classList.toggle("show", active);
+      byId("verifyButton").disabled = active || !modelConfigured;
+      byId("cancelButton").hidden = !active;
     }
 
-    function clearError() {
-      byId("error").style.display = "none";
-      byId("error").textContent = "";
+    function showError(detail) {
+      const error = byId("error");
+      error.replaceChildren(node("strong", "", "Verification failed"), node("span", "", detail));
+      error.classList.add("show");
+      byId("result").classList.remove("show");
+      byId("findingsSection").hidden = true;
     }
 
-    function setRunning(running) {
-      byId("verifyButton").disabled = running;
-      byId("stopButton").hidden = !running;
-      byId("running").classList.toggle("show", running);
+    function errorText(payload) {
+      const detail = payload?.detail;
+      if (typeof detail === "string") return detail;
+      if (detail?.message) return detail.code ? `${detail.code}: ${detail.message}` : detail.message;
+      return "Request failed. Pull request was not changed.";
     }
 
-    function sourceLink(label, href) {
-      const link = textNode("a", "link-button", label);
-      link.href = href;
-      link.target = "_blank";
-      link.rel = "noreferrer";
-      return link;
-    }
+    function chip(text) { return node("span", "chip", text); }
 
-    function renderFinding(item) {
-      const article = document.createElement("article");
-      article.className = "panel finding";
-      const top = document.createElement("div");
-      top.className = "finding-top";
-      const titleWrap = document.createElement("div");
-      titleWrap.append(textNode("div", "rule", item.rule_id), textNode("h4", "finding-title", item.title));
-      top.append(titleWrap, textNode("span", `severity ${item.severity}`, item.severity));
-      article.append(top);
-      article.append(textNode("div", "location", `${item.path}:${item.line} · ${Math.round(item.confidence * 100)}% confidence`));
-      article.append(textNode("pre", "evidence", item.evidence));
-
-      const grid = document.createElement("div");
-      grid.className = "finding-grid";
-      const impact = document.createElement("div");
-      impact.className = "finding-block";
-      impact.append(textNode("span", "", "Impact"), textNode("p", "", item.impact));
-      const proof = document.createElement("div");
-      proof.className = "finding-block proof";
-      proof.append(textNode("span", "", "Suggested verification"), textNode("p", "", item.suggested_test));
+    function renderFinding(item, index) {
+      const card = node("details", "card finding");
+      card.open = index === 0;
+      const heading = node("summary");
+      const top = node("div", "finding-top");
+      top.append(
+        node("span", `severity ${item.severity}`, item.severity),
+        node("span", "finding-name", item.title),
+        node("span", "", `${item.path}:${item.line}`)
+      );
+      heading.append(top);
+      const body = node("div", "finding-body");
+      const evidence = node("p", "evidence", item.evidence);
+      const grid = node("div", "finding-grid");
+      const impact = node("div");
+      impact.append(node("b", "", "Impact"), node("p", "", item.impact));
+      const proof = node("div");
+      proof.append(node("b", "", "Verify"), node("p", "", item.suggested_test));
       grid.append(impact, proof);
-      article.append(grid);
-      return article;
+      body.append(evidence, grid);
+      card.append(heading, body);
+      return card;
     }
 
     function renderReport(data, scroll = true) {
       const verdict = byId("verdict");
       verdict.className = `verdict ${data.verdict}`;
-      verdict.textContent = data.verdict.replace("_", " ");
-      byId("runId").textContent = data.run_id;
+      verdict.textContent = data.verdict.replaceAll("_", " ");
       byId("intentTitle").textContent = data.intent;
       byId("summary").textContent = data.summary;
       byId("score").textContent = data.risk_score;
-      byId("filesMetric").textContent = data.files_changed;
-      byId("findingsMetric").textContent = data.findings.length;
-      byId("driftMetric").textContent = `${data.scope_drift ?? 0}%`;
-      byId("modelMetric").textContent = data.model_used || "Offline";
-      byId("evidenceHash").textContent = data.evidence_hash ? `Evidence ${data.evidence_hash.slice(0, 12)}…` : "";
 
-      const actions = byId("sourceActions");
-      actions.replaceChildren();
-      if (data.source?.url) actions.append(sourceLink("Open pull request ↗", data.source.url));
-      if (data.source?.repo) actions.append(sourceLink("Open repository ↗", `https://github.com/${data.source.repo}`));
-      if (data.source?.state) actions.append(textNode("span", "link-button", `PR ${data.source.state}`));
+      const sourceLabel = data.source?.intent_source === "repository-policy"
+        ? data.source.intent_path || "base policy"
+        : "provided intent";
+      byId("meta").replaceChildren(
+        chip(`${data.files_changed} files`),
+        chip(`${data.findings.length} findings`),
+        chip(`${data.applicable_checks?.length || 0} gates`),
+        chip(sourceLabel),
+        chip(`${data.model_used || "model not recorded"} · ${data.synthesis_attempts || 0} attempt(s)`),
+        chip(`${data.duration_ms ?? data.synthesis_duration_ms ?? 0} ms total`),
+        ...(data.synthesis_input_truncated ? [chip("model input truncated")] : [])
+      );
 
-      const decisions = byId("decisions");
-      decisions.replaceChildren(...(data.unresolved_questions || []).map(question => {
-        const node = document.createElement("div");
-        node.className = "panel decision";
-        node.append(textNode("p", "", question));
-        return node;
+      const links = byId("sourceLinks");
+      links.replaceChildren();
+      if (data.source?.url) {
+        const pr = node("a", "", "Open pull request ↗");
+        pr.href = data.source.url; pr.target = "_blank"; pr.rel = "noreferrer"; links.append(pr);
+      }
+      if (data.source?.repo) {
+        const repo = node("a", "", "Open repository ↗");
+        repo.href = `https://github.com/${data.source.repo}`; repo.target = "_blank"; repo.rel = "noreferrer"; links.append(repo);
+      }
+
+      byId("trace").replaceChildren(...(data.timeline || []).map(event => {
+        const row = node("li"); row.append(node("b", "", event.step.replaceAll("-", " ")), document.createTextNode(event.detail)); return row;
       }));
-      byId("decisionSection").hidden = !(data.unresolved_questions || []).length;
+      byId("result").classList.add("show");
 
       const findings = byId("findings");
-      if (data.findings.length) findings.replaceChildren(...data.findings.map(renderFinding));
-      else findings.replaceChildren(textNode("div", "panel empty-findings", "Configured gates found no blocker. PASS remains scoped, not universal proof."));
-
-      byId("timeline").replaceChildren(...(data.timeline || []).map(event => {
-        const node = document.createElement("div");
-        node.className = "timeline-item";
-        node.append(textNode("strong", "", event.step.replaceAll("-", " ")), textNode("span", "", event.detail));
-        return node;
-      }));
-
-      const impact = byId("impact");
-      const areas = data.impact_areas || [];
-      if (areas.length) impact.replaceChildren(...areas.map(area => {
-        const node = document.createElement("div");
-        node.className = "impact-chip";
-        node.append(textNode("strong", "", area.name), document.createTextNode(` · ${area.risk} · ${area.paths.length} file(s)`));
-        return node;
-      }));
-      else impact.replaceChildren(textNode("span", "history-empty", "No configured impact area matched."));
-
-      const alignment = byId("alignments");
-      const alignments = data.alignments || [];
-      alignment.replaceChildren(...alignments.map(item => {
-        const node = document.createElement("div");
-        node.className = "alignment";
-        node.append(textNode("span", `alignment-status ${item.status}`, item.status));
-        node.append(textNode("strong", "", item.clause));
-        node.append(textNode("p", "", `${item.path}:${item.line} · ${item.rationale}`));
-        return node;
-      }));
-      byId("alignmentSection").hidden = !alignments.length;
-
-      byId("results").classList.add("show");
-      if (scroll) byId("results").scrollIntoView({behavior:"smooth", block:"start"});
-    }
-
-    async function loadRuns() {
-      const response = await fetch("/api/runs?limit=20");
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.detail || "Could not load run history");
-      const history = byId("history");
-      if (!data.runs.length) {
-        history.replaceChildren(textNode("div", "history-empty", "No verification runs yet."));
-        return;
-      }
-      history.replaceChildren(...data.runs.map(run => {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "history-item";
-        button.append(textNode("strong", "", run.source?.reference || run.intent || run.run_id));
-        const meta = document.createElement("div");
-        meta.className = "history-meta";
-        meta.append(textNode("span", `history-verdict ${run.verdict}`, run.verdict.replace("_", " ")));
-        meta.append(textNode("span", "", `${run.risk_score}/100`));
-        button.append(meta);
-        button.onclick = () => renderReport(run);
-        return button;
-      }));
+      findings.replaceChildren(...(data.findings || []).map(renderFinding));
+      if (!(data.findings || []).length) findings.append(node("div", "card empty", "No blocker found by applicable gates."));
+      byId("findingsSection").hidden = false;
+      if (scroll) byId("result").scrollIntoView({behavior:"smooth", block:"start"});
     }
 
     async function loadConfig() {
       const response = await fetch("/api/config");
       const data = await response.json();
-      if (!response.ok) throw new Error(data.detail || "Configuration check failed");
-      config = data;
-      const configured = Boolean(data.model?.configured);
-      byId("modelLight").className = `status-light ${configured ? "ready" : "warn"}`;
-      byId("modelLabel").textContent = configured ? `${data.model.provider} ready` : "Offline mode";
-      byId("modelDetail").textContent = configured ? data.model.model : "Add backend API key";
-      byId("useModel").checked = configured;
-      byId("useModel").disabled = !configured;
+      modelConfigured = Boolean(data.model?.configured);
+      byId("modelDot").classList.toggle("ready", modelConfigured);
+      byId("modelStatus").textContent = modelConfigured
+        ? `${data.model.provider} configured · ${data.model.model}`
+        : "Model not configured";
+      byId("verifyButton").disabled = !modelConfigured;
+      if (!modelConfigured) showError("Add backend API key, then restart CodeTrust.");
     }
 
-    async function verifyPullRequest(event) {
+    async function loadRuns() {
+      const response = await fetch("/api/runs?limit=5");
+      if (!response.ok) return;
+      const data = await response.json();
+      const history = byId("history");
+      const currentRuns = data.runs.filter(run => run.schema_version === 2);
+      history.replaceChildren(...currentRuns.map(run => {
+        const button = node("button");
+        button.type = "button";
+        button.append(node("span", "", run.source?.reference || run.intent), node("span", "", run.verdict));
+        button.onclick = () => renderReport(run);
+        return button;
+      }));
+      byId("historySection").hidden = !currentRuns.length;
+    }
+
+    byId("verifyForm").addEventListener("submit", async event => {
       event.preventDefault();
-      clearError();
-      activeController = new AbortController();
+      byId("error").classList.remove("show");
+      controller = new AbortController();
       setRunning(true);
       try {
         const response = await fetch("/api/github", {
           method:"POST",
           headers:{"content-type":"application/json"},
-          signal:activeController.signal,
+          signal:controller.signal,
           body:JSON.stringify({
             reference:byId("prReference").value.trim(),
             intent:byId("intent").value.trim(),
-            offline:!byId("useModel").checked
+            model_mode:"required"
           })
         });
         const data = await response.json();
-        if (!response.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Verification failed");
+        if (!response.ok) {
+          if (data.detail?.code === "MISSING_APPROVED_INTENT") byId("advanced").open = true;
+          throw new Error(errorText(data));
+        }
         renderReport(data);
         await loadRuns();
       } catch (error) {
-        showError(error.name === "AbortError" ? "Request stopped. Pull request remains unchanged." : error.message);
+        showError(error.name === "AbortError" ? "Stopped waiting. Pull request was not changed." : error.message);
       } finally {
-        activeController = null;
+        controller = null;
         setRunning(false);
       }
-    }
+    });
 
-    function resetForm() {
-      byId("verifyForm").reset();
-      byId("useModel").checked = Boolean(config?.model?.configured);
-      byId("results").classList.remove("show");
-      clearError();
-      byId("verify").scrollIntoView({behavior:"smooth", block:"start"});
-      byId("prReference").focus();
-    }
-
-    async function init() {
-      byId("verifyForm").onsubmit = verifyPullRequest;
-      byId("stopButton").onclick = () => activeController?.abort();
-      byId("newRun").onclick = resetForm;
-      byId("refreshRuns").onclick = () => loadRuns().catch(error => showError(error.message));
-      await Promise.all([loadConfig(), loadRuns()]);
-    }
-
-    init().catch(error => showError(error.message));
+    byId("cancelButton").onclick = () => controller?.abort();
+    loadConfig().then(loadRuns).catch(() => showError("CodeTrust backend unavailable."));
   </script>
 </body>
-</html>"""
+</html>
+"""

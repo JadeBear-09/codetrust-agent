@@ -7,16 +7,18 @@ CodeTrust is verification firewall between software agents and production. It co
 ## Current local product
 
 - [x] Accept live GitHub PR URL.
-- [x] Accept approved intent or use PR description.
+- [x] Load approved intent from exact base-commit policy or explicit input.
 - [x] Parse exact changed-file and line evidence.
 - [x] Map scope alignment and business/technical impact.
 - [x] Run deterministic risk gates.
 - [x] Generate adversarial verification suggestions.
-- [x] Use optional Gemini or OpenAI-compatible model for bounded synthesis.
+- [x] Require bounded Gemini or OpenAI-compatible synthesis in website flows.
 - [x] Return `BLOCK`, `NEEDS_REVIEW`, or `PASS`.
 - [x] Persist bounded local report history without raw ticket or diff.
 - [x] Provide focused responsive website with no auto-loaded sample data.
 - [x] Preserve offline verification path.
+- [x] Fail explicitly when required intent or model synthesis is unavailable.
+- [x] Cover common source languages with generic gates and report skipped gates.
 
 ## Production service work
 

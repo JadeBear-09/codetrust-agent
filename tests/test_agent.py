@@ -26,19 +26,40 @@ def test_offline_agent_blocks_risky_demo(tmp_path: Path) -> None:
 
 
 def test_safe_change_passes() -> None:
-    ticket = "# Rename internal display label"
+    ticket = """## Outcome
+- Rename internal display label.
+
+## Acceptance criteria
+- Updated label appears in the review screen.
+"""
     diff = """diff --git a/ui/labels.py b/ui/labels.py
 --- a/ui/labels.py
 +++ b/ui/labels.py
 @@ -1 +1 @@
 -LABEL = "Pending"
 +LABEL = "Awaiting review"
+diff --git a/tests/test_labels.py b/tests/test_labels.py
+--- /dev/null
++++ b/tests/test_labels.py
+@@ -0,0 +1,2 @@
++def test_review_label():
++    assert LABEL == "Awaiting review"
 """
 
     report = verify_change(ticket, diff, offline=True)
 
     assert report.verdict is Verdict.PASS
     assert report.risk_score == 0
+
+
+def test_unstructured_intent_never_passes() -> None:
+    report = verify_change(
+        "# Rename label",
+        "diff --git a/a.c b/a.c\n--- a/a.c\n+++ b/a.c\n@@ -1 +1 @@\n-old\n+new\n",
+        offline=True,
+    )
+
+    assert report.verdict is Verdict.NEEDS_REVIEW
 
 
 def test_explicit_business_scope_drift_blocks_change() -> None:

@@ -14,7 +14,7 @@ Findings come from deterministic gates and exact diff lines. Model output is res
 
 ## “What if CodeTrust misses a risk?”
 
-`PASS` means no configured gate found a blocker, not guaranteed safety. Production rollout needs calibrated evaluations, repository-specific policies, defense in depth, and human review for high-impact changes.
+`PASS` requires structured approved intent, at least one applicable gate, and no finding. It is not guaranteed safety. Production rollout still needs calibrated evaluations, defense in depth, and human review for high-impact changes.
 
 ## “How does this scale across repositories?”
 
@@ -53,11 +53,11 @@ The scenario reflects distributed systems, multiple market adapters, backward co
 Use this map:
 
 - `diff_parser.py`: converts unified diff text into typed changed-line evidence.
-- `github.py`: loads real PR metadata and diff through fixed GitHub CLI calls.
+- `github.py`: loads real PR metadata, diff, and base-commit policy through fixed GitHub CLI calls.
 - `impact.py`: maps affected business and technical surfaces.
-- `rules.py`: five independent verification gates plus transparent scoring.
+- `rules.py`: repository-agnostic core gates plus conditional domain gates and transparent scoring.
 - `testgen.py`: generates missing adversarial proof templates.
-- `llm.py`: bounded Responses API synthesis with offline fallback.
+- `llm.py`: bounded model synthesis with retries, fallback model, explicit errors, and latency metadata.
 - `agent.py`: orchestration, trace, verdict, and evidence hash.
 - `report.py`: JSON, Markdown, and escaped HTML evidence artifacts.
 - `cli.py`: fixed local interface and constrained `git diff` tool.

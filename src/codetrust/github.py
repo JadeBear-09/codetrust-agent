@@ -1,14 +1,26 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 import re
 import subprocess
 from dataclasses import dataclass
+from pathlib import PurePosixPath
 
 PR_REF = re.compile(r"^(?P<repo>[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)#(?P<number>[1-9]\d*)$")
 PR_URL = re.compile(
     r"^https://github\.com/(?P<repo>[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)/pull/(?P<number>[1-9]\d*)/?$"
 )
+POLICY_PATHS = (
+    ".codetrust/policy.md",
+    "CODETRUST.md",
+    ".github/CODETRUST.md",
+    "docs/CODETRUST.md",
+    "PRODUCT.md",
+    "docs/PRODUCT.md",
+)
+MAX_POLICY_BYTES = 100_000
 
 
 @dataclass(frozen=True)
@@ -34,6 +46,13 @@ class PullRequestChange:
     merged_at: str | None = None
     author: str = ""
     comments: tuple[PullRequestComment, ...] = ()
+
+
+@dataclass(frozen=True)
+class RepositoryPolicy:
+    path: str
+    content: str
+    sha256: str
 
 
 def load_pull_request(reference: str) -> PullRequestChange:
@@ -74,6 +93,52 @@ def load_pull_request(reference: str) -> PullRequestChange:
         author=str(author.get("login") or ""),
         comments=comments,
     )
+
+
+def load_repository_policy(repo: str, revision: str) -> RepositoryPolicy | None:
+    """Load first canonical policy from trusted base revision without checking out code."""
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repo) or not re.fullmatch(
+        r"[0-9a-fA-F]{7,64}", revision
+    ):
+        raise ValueError("Repository or base revision is invalid")
+    for path in repository_policy_paths():
+        try:
+            content = _run_gh(
+                [
+                    "api",
+                    "--method",
+                    "GET",
+                    f"repos/{repo}/contents/{path}",
+                    "-f",
+                    f"ref={revision}",
+                    "-H",
+                    "Accept: application/vnd.github.raw+json",
+                ]
+            )
+        except RuntimeError as exc:
+            if "HTTP 404" in str(exc) or "Not Found" in str(exc):
+                continue
+            raise
+        encoded = content.encode()
+        if len(encoded) > MAX_POLICY_BYTES:
+            raise RuntimeError(f"Repository policy `{path}` exceeds {MAX_POLICY_BYTES} bytes")
+        return RepositoryPolicy(
+            path=path,
+            content=content,
+            sha256=hashlib.sha256(encoded).hexdigest(),
+        )
+    return None
+
+
+def repository_policy_paths() -> tuple[str, ...]:
+    configured = os.getenv("CODETRUST_POLICY_PATHS", "")
+    candidates = tuple(item.strip() for item in configured.split(",") if item.strip())
+    paths = candidates or POLICY_PATHS
+    for path in paths:
+        parsed = PurePosixPath(path)
+        if parsed.is_absolute() or ".." in parsed.parts:
+            raise ValueError(f"Unsafe repository policy path: {path}")
+    return paths
 
 
 def normalize_pr_reference(value: str) -> str:

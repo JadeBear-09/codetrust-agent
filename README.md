@@ -18,7 +18,7 @@ Approved intent + GitHub pull request
        Deterministic risk gates
                   │
                   ▼
-        Optional model synthesis
+        Required model synthesis
                   │
                   ▼
  BLOCK / NEEDS_REVIEW / PASS + evidence
@@ -40,7 +40,7 @@ gh auth login
 python3 start.py
 ```
 
-Open <http://127.0.0.1:8787>. Paste a full GitHub pull-request URL, optionally provide approved intent, and select **Verify pull request**.
+Open <http://127.0.0.1:8787>. Paste a full GitHub pull-request URL and select **Verify pull request**. CodeTrust reads canonical intent from the pull request's base commit. Use the Advanced field only when the repository has no policy file.
 
 `start.py` installs dependencies and starts the application. It does not load or execute sample data.
 
@@ -64,11 +64,15 @@ cp .env.example .env
 GEMINI_API_KEY=your_key
 CODETRUST_MODEL=gemini-3.5-flash
 CODETRUST_FALLBACK_MODEL=gemini-3.1-flash-lite
+CODETRUST_MODEL_TIMEOUT_SECONDS=30
+CODETRUST_MODEL_MAX_ATTEMPTS=3
+CODETRUST_MODEL_DIFF_CHARS=400000
+CODETRUST_POLICY_PATHS=.codetrust/policy.md,CODETRUST.md,.github/CODETRUST.md,docs/CODETRUST.md,PRODUCT.md,docs/PRODUCT.md
 ```
 
 Secrets remain in backend environment. Browser receives only safe provider name, model name, and configured/unconfigured status.
 
-Transient provider failures are retried. Gemini high-demand failures fall back to configured stable fallback model; report records exact model used.
+Transient provider failures and timeouts use bounded retries. Gemini high-demand failures can use the configured stable fallback model. If every attempt fails, the request fails explicitly; CodeTrust never labels failed online synthesis as offline success. Reports record exact model, attempts, and duration.
 
 OpenAI-compatible configuration is also supported:
 
@@ -77,7 +81,20 @@ OPENAI_API_KEY=your_key
 CODETRUST_MODEL=gpt-5.4
 ```
 
-Without a provider key, deterministic verification still works in offline mode.
+The website requires a provider key. Explicit offline verification remains available through the CLI for local recovery and deterministic development.
+
+## Approved intent
+
+CodeTrust searches the pull request's exact base commit in this order:
+
+1. `.codetrust/policy.md`
+2. `CODETRUST.md`
+3. `.github/CODETRUST.md`
+4. `docs/CODETRUST.md`
+5. `PRODUCT.md`
+6. `docs/PRODUCT.md`
+
+Override this order with `CODETRUST_POLICY_PATHS` for repositories using different conventions. Policy needs an **Outcome**, **In scope**, **Out of scope**, or **Acceptance criteria** heading. Policy path, base commit, and content hash are saved with the report. Pull-request title and description are never treated as approved intent.
 
 ## Verify from CLI
 
@@ -90,7 +107,7 @@ uv run codetrust verify \
   --output-dir reports
 ```
 
-Use PR description as intent by omitting `--ticket`:
+Use repository policy from the PR base commit by omitting `--ticket`:
 
 ```bash
 uv run codetrust verify --github-pr OWNER/REPOSITORY#123
@@ -132,7 +149,7 @@ curl http://127.0.0.1:8787/api/github \
   -d '{
     "reference":"https://github.com/OWNER/REPOSITORY/pull/123",
     "intent":"## Out of scope\n- Billing policy changes",
-    "offline":false
+    "model_mode":"required"
   }'
 ```
 

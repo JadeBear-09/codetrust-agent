@@ -6,7 +6,8 @@ import sys
 from pathlib import Path
 
 from codetrust.agent import verify_change
-from codetrust.github import load_pull_request
+from codetrust.github import load_pull_request, load_repository_policy
+from codetrust.llm import SynthesisError
 from codetrust.report import write_reports
 
 
@@ -45,7 +46,12 @@ def main(argv: list[str] | None = None) -> int:
     source = {"type": "diff"}
     if args.github_pr:
         change = load_pull_request(args.github_pr)
-        ticket = args.ticket.read_text() if args.ticket else change.ticket
+        policy = None if args.ticket else load_repository_policy(change.repo, change.base_sha)
+        if not args.ticket and policy is None:
+            raise SystemExit(
+                "No approved policy found on base commit. Add CODETRUST.md or pass --ticket."
+            )
+        ticket = args.ticket.read_text() if args.ticket else policy.content
         diff = change.diff
         source = {
             "type": "github-pr",
@@ -53,14 +59,21 @@ def main(argv: list[str] | None = None) -> int:
             "url": change.url,
             "base_sha": change.base_sha,
             "head_sha": change.head_sha,
+            "intent_source": "provided" if args.ticket else "repository-policy",
         }
+        if policy is not None:
+            source.update(intent_path=policy.path, intent_sha256=policy.sha256)
     else:
         if not args.ticket:
             raise SystemExit("--ticket is required with --diff or --git-range")
         ticket = args.ticket.read_text()
         diff = args.diff.read_text() if args.diff else _git_diff(args.repo, args.git_range)
         source = {"type": "diff" if args.diff else "git-range"}
-    report = verify_change(ticket, diff, offline=args.offline, source=source)
+    try:
+        report = verify_change(ticket, diff, offline=args.offline, source=source)
+    except SynthesisError as exc:
+        print(f"{exc.code}: {exc}", file=sys.stderr)
+        return 2
     paths = write_reports(report, args.output_dir)
     print(
         f"{report.verdict.value} · risk {report.risk_score}/100 · {len(report.findings)} finding(s)"

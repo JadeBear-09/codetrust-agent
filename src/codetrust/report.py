@@ -92,7 +92,22 @@ def render_markdown(report: VerificationReport) -> str:
         lines.append("- None raised by current gates.")
     lines.extend(["", "## Agent trace", ""])
     lines.extend(f"- `{event.step}` — {event.status}: {event.detail}" for event in report.timeline)
-    lines.extend(["", f"Model: `{report.model_used or 'offline'}`", ""])
+    lines.extend(
+        [
+            "",
+            "## Synthesis",
+            "",
+            f"- Status: `{report.synthesis_status.value}`",
+            f"- Model: `{report.model_used or 'disabled'}`",
+            f"- Attempts: {report.synthesis_attempts}",
+            f"- Duration: {report.synthesis_duration_ms} ms",
+            f"- Input truncated: {'yes' if report.synthesis_input_truncated else 'no'}",
+            f"- Total verification duration: {report.duration_ms} ms",
+            f"- Applicable gates: {len(report.applicable_checks)}",
+            f"- Skipped gates: {len(report.skipped_checks)}",
+            "",
+        ]
+    )
     return "\n".join(lines)
 
 
@@ -183,5 +198,5 @@ def render_html(report: VerificationReport) -> str:
 <h2>Generated adversarial tests</h2><section class="grid">{generated}</section>
 <section class="panel" style="margin-top:24px"><div class="eyebrow">Human boundary</div><h2 style="margin-top:8px">Unresolved decisions</h2><ul>{questions}</ul></section>
 <h2>Agent trace</h2><section class="panel"><ol class="trace">{trace}</ol></section>
-<footer>CodeTrust · verification evidence, not automatic approval · model {html.escape(report.model_used or "offline")}</footer>
+<footer>CodeTrust · verification evidence, not automatic approval · model {html.escape(report.model_used or "disabled")} · {report.synthesis_duration_ms} ms</footer>
 </main></body></html>"""

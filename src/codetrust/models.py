@@ -18,6 +18,11 @@ class Verdict(StrEnum):
     PASS = "PASS"
 
 
+class SynthesisStatus(StrEnum):
+    COMPLETE = "complete"
+    DISABLED = "disabled"
+
+
 class AlignmentStatus(StrEnum):
     SUPPORTED = "supported"
     CONTRADICTED = "contradicted"
@@ -134,15 +139,25 @@ class VerificationReport:
     adversarial_tests: list[AdversarialTest] = field(default_factory=list)
     source: dict[str, str] = field(default_factory=dict)
     model_used: str | None = None
+    synthesis_status: SynthesisStatus = SynthesisStatus.DISABLED
+    synthesis_attempts: int = 0
+    synthesis_duration_ms: int = 0
+    synthesis_input_truncated: bool = False
+    duration_ms: int = 0
     evidence_hash: str = ""
     intent_snapshot: IntentSnapshot | None = None
     interpretations: list[InterpretationClaim] = field(default_factory=list)
     alignments: list[ScopeAlignment] = field(default_factory=list)
     scope_coverage: int | None = None
     scope_drift: int = 0
+    applicable_checks: list[str] = field(default_factory=list)
+    skipped_checks: list[str] = field(default_factory=list)
+    gate_coverage: int = 0
+    schema_version: int = 2
 
     def to_dict(self) -> dict[str, Any]:
         return {
+            "schema_version": self.schema_version,
             "run_id": self.run_id,
             "created_at": self.created_at,
             "intent": self.intent,
@@ -158,6 +173,11 @@ class VerificationReport:
             "adversarial_tests": [asdict(test) for test in self.adversarial_tests],
             "source": self.source,
             "model_used": self.model_used,
+            "synthesis_status": self.synthesis_status.value,
+            "synthesis_attempts": self.synthesis_attempts,
+            "synthesis_duration_ms": self.synthesis_duration_ms,
+            "synthesis_input_truncated": self.synthesis_input_truncated,
+            "duration_ms": self.duration_ms,
             "evidence_hash": self.evidence_hash,
             "intent_snapshot": asdict(self.intent_snapshot) if self.intent_snapshot else None,
             "interpretations": [asdict(item) for item in self.interpretations],
@@ -166,4 +186,7 @@ class VerificationReport:
             ],
             "scope_coverage": self.scope_coverage,
             "scope_drift": self.scope_drift,
+            "applicable_checks": self.applicable_checks,
+            "skipped_checks": self.skipped_checks,
+            "gate_coverage": self.gate_coverage,
         }

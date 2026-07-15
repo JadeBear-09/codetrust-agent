@@ -18,7 +18,7 @@ Source: [official HackerEarth Talent Hack page](https://www.hackerearth.com/comm
 |---|---|
 | Strong Python | Typed Python package, CLI, API, tests |
 | Agentic AI | Multi-stage scope, impact, challenge, test-design, decision workflow |
-| Production AI | Deterministic evidence boundary, offline fallback, CI, container, health check |
+| Production AI | Deterministic evidence boundary, explicit provider failures, CI, container, health check |
 | Multi-agent orchestration | Specialist stages with explicit trace and bounded responsibilities |
 | RAG/knowledge systems | Future adapter point; do not add fake RAG where repository context is sufficient |
 | API development | FastAPI verification endpoints and OpenAPI docs |
@@ -69,4 +69,3 @@ Real PR → autonomous trace → hidden production failure → generated proof f
 ## Personal readiness blocker
 
 Confirm Round 1 invitation from `support@hackerearth.com`. Public page states non-invited registrants cannot take Round 1.
-

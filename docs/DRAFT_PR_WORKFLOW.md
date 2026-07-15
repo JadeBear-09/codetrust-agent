@@ -12,7 +12,7 @@ git pull --ff-only
 git switch -c test/codetrust-verdict
 ```
 
-Make one intentionally risky change. Include approved intent and expected boundaries in PR description. CodeTrust treats that description as intent when dashboard intent field is blank.
+Make one intentionally risky change. Keep approved intent in `CODETRUST.md` on the base branch, or prepare a separate approved-intent document for the Advanced field. Pull-request author text is never treated as approved intent.
 
 ## 2. Commit locally
 
@@ -46,8 +46,8 @@ Copy returned PR URL.
 1. Start CodeTrust with `python3 start.py`.
 2. Open <http://127.0.0.1:8787>.
 3. Paste draft PR URL.
-4. Leave approved-intent field blank to use PR description, or paste stricter policy.
-5. Keep model synthesis enabled when provider status says ready.
+4. Leave Advanced intent blank to use base-commit repository policy, or paste separately approved intent.
+5. Confirm provider status says configured. Website model synthesis is required.
 6. Select **Verify pull request**.
 7. Review verdict and every evidence-backed finding.
 
