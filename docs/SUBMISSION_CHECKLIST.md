@@ -18,11 +18,11 @@
 
 ## Demo
 
-- [ ] Analyze real demo PR.
-- [ ] Show `BLOCK 100/100`, not setup steps.
-- [ ] Show exact duplicate-payment evidence.
-- [ ] Run adversarial failure proof.
-- [ ] Show fix, passing proof, and reduced risk score.
+- [x] Analyze public GnuCash PR and confirm `BLOCK 100/100`.
+- [x] Confirm recorded maintainer outcome is closed unmerged as out of scope.
+- [x] Analyze private CodeTrust PR and confirm `BLOCK 94/100`.
+- [ ] Record public policy-match flow without claiming blind prediction.
+- [ ] Show exact duplicate-payment and async-blocking evidence.
 - [ ] Finish spoken flow under five minutes.
 - [ ] Record 90-second backup video.
 - [ ] Keep offline report and screenshots ready.
@@ -47,4 +47,3 @@
 - [ ] Explain production isolation and secret controls.
 - [ ] Explain why existing linters are insufficient.
 - [ ] Explain how solution changes for actual DTDL problem statement.
-

@@ -16,9 +16,12 @@ AI coding agents scale code output, but trust does not scale with it. Senior eng
 
 CodeTrust acts as a verification firewall between coding agents and production. It ingests a real GitHub pull request, reconstructs ticket intent, maps affected business domains, selects risk-specific checks, challenges unsafe assumptions, generates adversarial tests, and produces an evidence pack. Deterministic gates own factual findings; model reasoning explains intent and uncertainty. Humans receive only unresolved business decisions.
 
-## Demo scenario
+## Demo scenarios
 
-An agent adds asynchronous payment reconciliation. Code looks correct and a success test passes. CodeTrust discovers blocking I/O, duplicate-payment risk, a broken market-adapter contract, a missing rollback, and absent failure coverage. It blocks the change, proposes missing adversarial tests, and asks one human question about the idempotency key.
+1. **External policy validation:** CodeTrust checks public `Gnucash/gnucash#2262` against an explicit appearance-policy boundary and returns `BLOCK 100/100`. The recorded maintainer outcome is then revealed: closed unmerged as out of scope.
+2. **Private technical verification:** CodeTrust checks private `JadeBear-09/codetrust-agent#2` and returns `BLOCK 94/100` for missing idempotency, blocking I/O in an async path, rollback risk, and absent failure-path coverage.
+
+The external example demonstrates one policy-verdict match. It is not claimed as blind prediction or universal accuracy.
 
 ## Differentiation
 
@@ -33,7 +36,7 @@ An agent adds asynchronous payment reconciliation. Code looks correct and a succ
 
 ## Technical architecture
 
-CodeTrust accepts ticket text plus a unified diff, git range, or GitHub pull request. A scope mapper extracts changed lines. An impact mapper identifies business and technical blast radius. A router selects async, payment, API, database, and test gates. A test designer creates missing adversarial proof. Findings drive deterministic risk score and verdict. OpenAI Responses API reconstructs intent and unresolved questions. FastAPI serves dashboard and API; CodeTrust emits HTML, Markdown, generated tests, and integrity-hashed JSON artifacts.
+CodeTrust accepts approved intent plus a unified diff, git range, or GitHub pull request. A scope mapper extracts changed lines and checks explicit boundaries. An impact mapper identifies business and technical blast radius. A router selects async, payment, API, database, and test gates. A test designer creates missing adversarial proof. Findings drive deterministic risk score and verdict. Gemini or an OpenAI-compatible provider reconstructs intent and unresolved questions without controlling verdict. FastAPI serves the focused dashboard and API; CodeTrust emits HTML, Markdown, generated tests, and integrity-hashed JSON artifacts.
 
 ## Responsible AI
 
@@ -41,26 +44,27 @@ CodeTrust does not silently merge or deploy. It treats tickets and code as untru
 
 ## Current status
 
-- Working CLI and visual evidence dashboard.
+- Working CLI and focused responsive PR-verification dashboard.
 - Live FastAPI service and OpenAPI documentation.
 - Real GitHub pull-request ingestion.
+- Explicit product-scope alignment and drift evidence.
 - Business-domain impact mapping.
 - Generated adversarial proof templates.
 - Executable duplicate-payment failure proof.
 - Five verification gates.
-- Offline and API-assisted modes.
-- Thirteen automated tests plus lint and GitHub CI.
+- Offline and Gemini-assisted modes with transient retry and fallback.
+- Thirty-two automated tests plus lint and GitHub CI.
 - Non-root Docker packaging and health check.
-- Seeded payment demo detecting all five target failures.
-- Real private PR comparison: risky candidate `BLOCK 94/100`; remediated candidate `PASS 0/100`.
+- Public external validation: GnuCash PR `BLOCK 100/100`, matching closed-unmerged out-of-scope maintainer decision.
+- Real private PR: risky candidate `BLOCK 94/100`.
 
 ## Roadmap
 
 Next steps are GitHub App installation flow, call-graph impact mapping, isolated target-repository test execution, repository-adapted test patches, and pre-fix versus post-fix evidence comparison.
 
-## Event-specific note
+## Submission warning
 
-DTDL will issue a new problem statement to finalists at the July 24–25 build event. This draft must be adapted to that problem. CodeTrust components remain reusable even if final product changes.
+Final pitch and scope must match official hackathon problem statement and judging rubric. Working software alone cannot guarantee ranking or a win.
 
 ## Closing
 

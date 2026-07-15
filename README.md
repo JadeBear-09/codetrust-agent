@@ -142,6 +142,10 @@ Create a disposable draft PR, paste its URL into CodeTrust, inspect verdict, the
 
 See [draft PR workflow](docs/DRAFT_PR_WORKFLOW.md) for exact commands.
 
+## Beginner demo and recording guide
+
+For exact public and private PR links, copy-paste intent, expected verdicts, recording order, and beginner instructions, see [beginner demo guide](docs/BEGINNER_DEMO_GUIDE.md).
+
 ## Offline fixture
 
 Repository keeps one deterministic offline fixture for development and recovery:

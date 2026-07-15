@@ -19,14 +19,14 @@ lint:
 	uv run ruff check .
 
 demo:
-	uv run codetrust verify --ticket demo/tickets/payment-reconciliation.md --diff demo/patches/risky-payment.diff --output-dir reports
+	@status=0; uv run codetrust verify --ticket demo/tickets/payment-reconciliation.md --diff demo/patches/risky-payment.diff --output-dir reports || status=$$?; [ $$status -le 1 ]
 
 demo-offline:
-	uv run codetrust verify --offline --ticket demo/tickets/payment-reconciliation.md --diff demo/patches/risky-payment.diff --output-dir reports
+	@status=0; uv run codetrust verify --offline --ticket demo/tickets/payment-reconciliation.md --diff demo/patches/risky-payment.diff --output-dir reports || status=$$?; [ $$status -le 1 ]
 
 demo-pr:
 	@test -n "$(PR)" || (echo "Usage: make demo-pr PR=OWNER/REPO#NUMBER" && exit 2)
-	uv run codetrust verify --github-pr "$(PR)" --ticket demo/policies/codetrust-scope.md --offline --output-dir reports/public-pr
+	@status=0; uv run codetrust verify --github-pr "$(PR)" --ticket demo/policies/codetrust-scope.md --offline --output-dir reports/public-pr || status=$$?; [ $$status -le 1 ]
 
 proof:
 	uv run python scripts/prove_demo.py
