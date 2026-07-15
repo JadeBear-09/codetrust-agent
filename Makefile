@@ -26,7 +26,7 @@ demo-offline:
 
 demo-pr:
 	@test -n "$(PR)" || (echo "Usage: make demo-pr PR=OWNER/REPO#NUMBER" && exit 2)
-	@status=0; uv run codetrust verify --github-pr "$(PR)" --ticket demo/policies/codetrust-scope.md --offline --output-dir reports/public-pr || status=$$?; [ $$status -le 1 ]
+	@status=0; uv run codetrust verify --github-pr "$(PR)" --output-dir reports/public-pr || status=$$?; [ $$status -le 1 ]
 
 proof:
 	uv run python scripts/prove_demo.py
@@ -35,4 +35,4 @@ serve:
 	uv run codetrust serve
 
 clean:
-	rm -f reports/*.json reports/*.md reports/*.html
+	rm -rf reports/*

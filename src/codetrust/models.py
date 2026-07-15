@@ -122,6 +122,17 @@ class ScopeAlignment:
     actor: str = "code"
 
 
+@dataclass(frozen=True)
+class ScopeComparison:
+    repository_purpose: str
+    change_summary: str
+    relationship: str
+    distance: int | None
+    differences: tuple[str, ...] = ()
+    evidence_paths: tuple[str, ...] = ()
+    rationale: str = ""
+
+
 @dataclass
 class VerificationReport:
     run_id: str
@@ -153,7 +164,8 @@ class VerificationReport:
     applicable_checks: list[str] = field(default_factory=list)
     skipped_checks: list[str] = field(default_factory=list)
     gate_coverage: int = 0
-    schema_version: int = 2
+    scope_comparison: ScopeComparison | None = None
+    schema_version: int = 3
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -189,4 +201,5 @@ class VerificationReport:
             "applicable_checks": self.applicable_checks,
             "skipped_checks": self.skipped_checks,
             "gate_coverage": self.gate_coverage,
+            "scope_comparison": asdict(self.scope_comparison) if self.scope_comparison else None,
         }

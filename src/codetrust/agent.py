@@ -4,6 +4,7 @@ import hashlib
 import json
 import time
 import uuid
+from dataclasses import asdict
 from datetime import UTC, datetime
 
 from codetrust.diff_parser import parse_unified_diff
@@ -12,6 +13,7 @@ from codetrust.llm import synthesize
 from codetrust.models import (
     AgentEvent,
     InterpretationClaim,
+    ScopeComparison,
     Severity,
     SynthesisStatus,
     Verdict,
@@ -29,12 +31,23 @@ def verify_change(
     offline: bool = False,
     source: dict[str, str] | None = None,
     interpretations: list[InterpretationClaim] | None = None,
+    change_claim: str = "",
+    additional_questions: list[str] | None = None,
+    scope_comparison: ScopeComparison | None = None,
 ) -> VerificationReport:
     started = time.monotonic()
     timeline: list[AgentEvent] = []
 
     files = parse_unified_diff(diff)
     timeline.append(AgentEvent("scope", "complete", f"Mapped {len(files)} changed file(s)."))
+
+    scope_trust = (source or {}).get("intent_trust", "trusted")
+    provenance_detail = {
+        "trusted": "Used explicit scope supplied by user.",
+        "inferred": "Used INFERRED scope anchored only to base-repository evidence.",
+        "insufficient": "Base-repository evidence was insufficient; review floor applied.",
+    }.get(scope_trust, f"Used scope trust state: {scope_trust}.")
+    timeline.append(AgentEvent("scope-provenance", "complete", provenance_detail))
 
     impact_areas = map_impact(files)
     timeline.append(
@@ -45,7 +58,7 @@ def verify_change(
         )
     )
 
-    scope = analyze_scope(ticket, files, interpretations)
+    scope = analyze_scope(ticket, files, interpretations, scope_trust)
     timeline.append(
         AgentEvent(
             "scope-alignment",
@@ -68,7 +81,14 @@ def verify_change(
         )
     )
 
-    synthesis = synthesize(ticket, diff, findings, offline)
+    synthesis = synthesize(
+        ticket,
+        diff,
+        findings,
+        offline,
+        change_claim=change_claim,
+        scope_trust=scope_trust,
+    )
     timeline.append(
         AgentEvent(
             "reconstruct-intent",
@@ -86,7 +106,9 @@ def verify_change(
         )
     )
 
-    score = risk_score(findings)
+    score = risk_score(
+        [item for item in findings if "-INFERRED-" not in item.rule_id]
+    )
     intent_is_structured = any(
         (
             scope.snapshot.outcome,
@@ -95,7 +117,14 @@ def verify_change(
             scope.snapshot.acceptance_criteria,
         )
     )
-    verdict = _verdict(findings, score, intent_is_structured, applicable_checks)
+    verdict = _verdict(
+        findings,
+        score,
+        intent_is_structured,
+        applicable_checks,
+        scope_trust,
+        scope_comparison,
+    )
     timeline.append(
         AgentEvent("decision", "complete", f"Verdict {verdict.value}; score {score}/100.")
     )
@@ -103,14 +132,22 @@ def verify_change(
     created_at = datetime.now(UTC).isoformat()
     run_id = f"ct-{uuid.uuid4().hex[:10]}"
     unresolved_questions = list(
-        dict.fromkeys([*scope.questions, *synthesis.unresolved_questions])
+        dict.fromkeys(
+            [
+                *scope.questions,
+                *synthesis.unresolved_questions,
+                *(additional_questions or []),
+            ]
+        )
     )
     evidence_payload = json.dumps(
         {
             "ticket": ticket,
+            "change_claim": change_claim,
             "diff": diff,
             "findings": [item.to_dict() for item in findings],
             "source": source or {"type": "diff"},
+            "scope_comparison": asdict(scope_comparison) if scope_comparison else None,
             "intent_snapshot": {
                 "outcome": scope.snapshot.outcome,
                 "in_scope": scope.snapshot.in_scope,
@@ -133,13 +170,21 @@ def verify_change(
     )
     evidence_hash = hashlib.sha256(evidence_payload.encode()).hexdigest()
 
+    report_intent = synthesis.intent
+    report_summary = synthesis.summary
+    if scope_trust == "insufficient":
+        report_intent = "Repository scope not established"
+        report_summary = (
+            "Base-repository evidence could not establish reliable scope; human review required."
+        )
+
     return VerificationReport(
         run_id=run_id,
         created_at=created_at,
-        intent=synthesis.intent,
+        intent=report_intent,
         verdict=verdict,
         risk_score=score,
-        summary=synthesis.summary,
+        summary=report_summary,
         files_changed=len(files),
         findings=findings,
         checks=checks,
@@ -167,6 +212,7 @@ def verify_change(
             if applicable_checks or skipped_checks
             else 0
         ),
+        scope_comparison=scope_comparison,
     )
 
 
@@ -175,13 +221,22 @@ def _verdict(
     score: int,
     intent_is_structured: bool,
     applicable_checks: list[str],
+    scope_trust: str = "trusted",
+    scope_comparison: ScopeComparison | None = None,
 ) -> Verdict:
     if any(item.rule_id == "CT-SCOPE-001" for item in findings):
         return Verdict.BLOCK
     if any(item.severity is Severity.CRITICAL for item in findings) or score >= 70:
         return Verdict.BLOCK
-    if any(item.severity is Severity.HIGH for item in findings) or score >= 35:
+    if any(item.severity in {Severity.HIGH, Severity.MEDIUM} for item in findings) or score >= 35:
         return Verdict.NEEDS_REVIEW
-    if findings or not intent_is_structured or not applicable_checks:
+    if scope_trust == "insufficient":
+        return Verdict.NEEDS_REVIEW
+    if scope_comparison and (
+        scope_comparison.relationship == "divergent"
+        or (scope_comparison.distance is not None and scope_comparison.distance >= 60)
+    ):
+        return Verdict.NEEDS_REVIEW
+    if not intent_is_structured or not applicable_checks:
         return Verdict.NEEDS_REVIEW
     return Verdict.PASS

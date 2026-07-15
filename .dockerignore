@@ -4,8 +4,16 @@
 __pycache__
 .pytest_cache
 .ruff_cache
+dist
+build
 reports
 artifacts
 .codetrust
+resources
+tests
+docs
+demo
+scripts
 *.pyc
 .env
+.DS_Store

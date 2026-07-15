@@ -66,6 +66,13 @@ DASHBOARD_HTML = r"""<!doctype html>
     .score { text-align:right; font-size:48px; line-height:1; font-weight:950; letter-spacing:-.06em }
     .score small { display:block; margin-top:7px; color:var(--muted); font-size:10px; letter-spacing:.1em; text-transform:uppercase }
     .meta { display:flex; flex-wrap:wrap; gap:8px; padding:0 26px 24px }
+    .comparison { display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:0 26px 26px }
+    .comparison-card { padding:16px; border:1px solid var(--line); border-radius:12px; background:#090d0a }
+    .comparison-card.wide { grid-column:1/-1 }
+    .comparison-card b { display:block; margin-bottom:6px; color:var(--green); font-size:10px; text-transform:uppercase; letter-spacing:.1em }
+    .comparison-card p { margin:0; color:#dbe3dc }
+    .difference-list { margin:0; padding-left:18px; color:#dbe3dc }
+    .difference-list li + li { margin-top:5px }
     .section { margin-top:30px }
     .section h3 { margin:0 0 12px; font-size:18px; letter-spacing:-.025em }
     .finding { padding:0; margin:0 0 10px; border-top:1px solid var(--line) }
@@ -90,7 +97,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     .history-list { display:grid; gap:8px; margin-top:12px }
     .history button { width:100%; display:flex; justify-content:space-between; padding:13px; color:var(--muted); background:var(--panel-2); border:1px solid var(--line); text-align:left }
     footer { margin-top:44px; color:#667068; font-size:12px; text-align:center }
-    @media(max-width:640px) { header{margin-bottom:34px}.result-head{grid-template-columns:1fr}.score{text-align:left}.finding-grid{grid-template-columns:1fr}.shell{width:min(100% - 20px,880px)}form{padding:18px} }
+    @media(max-width:640px) { header{margin-bottom:34px}.result-head{grid-template-columns:1fr}.score{text-align:left}.comparison{grid-template-columns:1fr}.comparison-card.wide{grid-column:auto}.finding-grid{grid-template-columns:1fr}.shell{width:min(100% - 20px,880px)}form{padding:18px} }
   </style>
 </head>
 <body>
@@ -101,21 +108,16 @@ DASHBOARD_HTML = r"""<!doctype html>
     </header>
 
     <h1>Verify pull request.</h1>
-    <p class="sub">Paste URL. Agent reads trusted base policy, live diff, and returns evidence.</p>
+    <p class="sub">Paste URL. Agent reads base repository, understands PR change, and measures scope distance.</p>
 
     <form class="card" id="verifyForm">
       <label for="prReference">GitHub pull request</label>
       <input id="prReference" name="reference" type="url" required autocomplete="url" placeholder="https://github.com/owner/repo/pull/42">
-      <details id="advanced">
-        <summary>Advanced: provide approved intent</summary>
-        <p class="advanced-copy">Use only when repository has no CODETRUST.md on base branch.</p>
-        <textarea id="intent" placeholder="## Outcome&#10;- ...&#10;&#10;## Out of scope&#10;- ...&#10;&#10;## Acceptance criteria&#10;- ..."></textarea>
-      </details>
       <div class="actions">
         <button class="primary" id="verifyButton" type="submit">Verify pull request</button>
         <button class="cancel" id="cancelButton" type="button" hidden>Stop waiting</button>
       </div>
-      <div class="running" id="running"><i class="spinner"></i><span>Reading policy, diff, gates, and Gemini…</span></div>
+      <div class="running" id="running"><i class="spinner"></i><span>Learning repository baseline and comparing PR…</span></div>
       <div class="error" id="error" role="alert"></div>
       <div class="principles"><span class="chip">No PR code execution</span><span class="chip">No silent model fallback</span><span class="chip">No repository mutation</span></div>
     </form>
@@ -123,9 +125,10 @@ DASHBOARD_HTML = r"""<!doctype html>
     <section class="card result" id="result" aria-live="polite">
       <div class="result-head">
         <div><span class="verdict" id="verdict"></span><h2 id="intentTitle"></h2><p class="summary" id="summary"></p></div>
-        <div class="score"><span id="score"></span><small>risk / 100</small></div>
+        <div class="score"><span id="score"></span><small id="scoreLabel">scope distance / 100</small></div>
       </div>
       <div class="meta" id="meta"></div>
+      <div class="comparison" id="comparison"></div>
       <div class="source-links" id="sourceLinks"></div>
       <details>
         <summary style="padding:0 26px 16px">Verification details</summary>
@@ -205,25 +208,53 @@ DASHBOARD_HTML = r"""<!doctype html>
     }
 
     function renderReport(data, scroll = true) {
+      const comparison = data.scope_comparison;
+      const relationship = comparison?.relationship || (data.source?.intent_trust === "insufficient" ? "insufficient" : "unscored");
       const verdict = byId("verdict");
-      verdict.className = `verdict ${data.verdict}`;
-      verdict.textContent = data.verdict.replaceAll("_", " ");
-      byId("intentTitle").textContent = data.intent;
-      byId("summary").textContent = data.summary;
-      byId("score").textContent = data.risk_score;
+      const relationshipClass = relationship === "divergent" || relationship === "insufficient" ? "NEEDS_REVIEW" : "PASS";
+      verdict.className = `verdict ${relationshipClass}`;
+      verdict.textContent = `${relationship.toUpperCase()} SCOPE`;
+      byId("intentTitle").textContent = comparison?.repository_purpose || data.intent;
+      byId("summary").textContent = comparison?.rationale || data.summary;
+      byId("score").textContent = comparison?.distance ?? "—";
+      byId("scoreLabel").textContent = "scope distance / 100";
 
-      const sourceLabel = data.source?.intent_source === "repository-policy"
-        ? data.source.intent_path || "base policy"
-        : "provided intent";
+      const intentSource = data.source?.intent_source;
+      const sourceLabel = intentSource === "repository-inference"
+          ? `INFERRED scope · ${data.source.scope_confidence || "unknown"} confidence`
+          : intentSource === "insufficient-repository-evidence"
+            ? "scope evidence insufficient"
+            : "repository-derived scope";
       byId("meta").replaceChildren(
         chip(`${data.files_changed} files`),
         chip(`${data.findings.length} findings`),
         chip(`${data.applicable_checks?.length || 0} gates`),
+        chip(`decision · ${data.verdict.replaceAll("_", " ")}`),
+        chip(`risk · ${data.risk_score}/100`),
         chip(sourceLabel),
+        ...(data.source?.scope_evidence_paths ? [chip(`base evidence · ${data.source.scope_evidence_paths}`)] : []),
         chip(`${data.model_used || "model not recorded"} · ${data.synthesis_attempts || 0} attempt(s)`),
         chip(`${data.duration_ms ?? data.synthesis_duration_ms ?? 0} ms total`),
         ...(data.synthesis_input_truncated ? [chip("model input truncated")] : [])
       );
+
+      const comparisonElement = byId("comparison");
+      comparisonElement.replaceChildren();
+      if (comparison) {
+        const baseline = node("div", "comparison-card");
+        baseline.append(node("b", "", "Repository baseline"), node("p", "", comparison.repository_purpose));
+        const change = node("div", "comparison-card");
+        change.append(node("b", "", "PR changes"), node("p", "", comparison.change_summary));
+        const differences = node("div", "comparison-card wide");
+        differences.append(node("b", "", "How PR differs"));
+        const list = node("ul", "difference-list");
+        const items = comparison.differences?.length ? comparison.differences : ["No material scope difference identified."];
+        list.append(...items.map(item => node("li", "", item)));
+        differences.append(list);
+        const evidence = node("div", "comparison-card wide");
+        evidence.append(node("b", "", "Base-repository evidence"), node("p", "", (comparison.evidence_paths || []).join(" · ") || "No validated evidence paths."));
+        comparisonElement.append(baseline, change, differences, evidence);
+      }
 
       const links = byId("sourceLinks");
       links.replaceChildren();
@@ -265,7 +296,7 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (!response.ok) return;
       const data = await response.json();
       const history = byId("history");
-      const currentRuns = data.runs.filter(run => run.schema_version === 2);
+      const currentRuns = data.runs.filter(run => run.schema_version === 3);
       history.replaceChildren(...currentRuns.map(run => {
         const button = node("button");
         button.type = "button";
@@ -288,13 +319,11 @@ DASHBOARD_HTML = r"""<!doctype html>
           signal:controller.signal,
           body:JSON.stringify({
             reference:byId("prReference").value.trim(),
-            intent:byId("intent").value.trim(),
             model_mode:"required"
           })
         });
         const data = await response.json();
         if (!response.ok) {
-          if (data.detail?.code === "MISSING_APPROVED_INTENT") byId("advanced").open = true;
           throw new Error(errorText(data));
         }
         renderReport(data);

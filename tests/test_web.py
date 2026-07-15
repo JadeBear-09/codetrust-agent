@@ -4,8 +4,9 @@ from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 
-from codetrust.github import RepositoryPolicy
 from codetrust.llm import SynthesisError
+from codetrust.models import ScopeComparison
+from codetrust.repository_scope import RepositoryIntent
 from codetrust.web import app
 
 client = TestClient(app)
@@ -58,64 +59,12 @@ def test_dashboard_verifies_diff_and_records_history(monkeypatch, tmp_path) -> N
     )
 
     assert response.status_code == 200
-    assert response.json()["verdict"] == "NEEDS_REVIEW"
+    assert response.json()["verdict"] == "PASS"
     history = client.get("/api/runs").json()["runs"]
     assert history[0]["run_id"] == response.json()["run_id"]
 
 
-def test_github_verification_uses_supplied_intent_and_model(monkeypatch, tmp_path) -> None:
-    monkeypatch.setenv("CODETRUST_DATA_DIR", str(tmp_path))
-    monkeypatch.setattr(
-        "codetrust.web.load_pull_request",
-        lambda _reference: SimpleNamespace(
-            ticket="# Pull request title\n\nPR description",
-            diff=(
-                "diff --git a/refunds/authorization.py b/refunds/authorization.py\n"
-                "--- a/refunds/authorization.py\n"
-                "+++ b/refunds/authorization.py\n"
-                "@@ -1 +1 @@\n-old = 30\n+new = 7\n"
-            ),
-            repo="acme/payments",
-            number=42,
-            url="https://github.com/acme/payments/pull/42",
-            base_sha="base",
-            head_sha="head",
-            state="OPEN",
-            author="developer",
-        ),
-    )
-    captured = {}
-
-    def fake_verify(ticket, diff, *, offline, source):
-        captured.update(ticket=ticket, diff=diff, offline=offline, source=source)
-        return SimpleNamespace(
-            to_dict=lambda: {
-                "run_id": "ct-test",
-                "created_at": "2026-07-15T00:00:00+00:00",
-                "intent": "Protect refund policy",
-                "verdict": "BLOCK",
-                "risk_score": 100,
-                "summary": "Scope drift",
-                "files_changed": 1,
-                "findings": [],
-                "checks": [],
-                "unresolved_questions": [],
-                "timeline": [],
-                "impact_areas": [],
-                "adversarial_tests": [],
-                "source": source,
-                "model_used": "gemini-test",
-                "evidence_hash": "hash",
-                "intent_snapshot": None,
-                "interpretations": [],
-                "alignments": [],
-                "scope_coverage": 0,
-                "scope_drift": 100,
-            }
-        )
-
-    monkeypatch.setattr("codetrust.web.verify_change", fake_verify)
-
+def test_github_request_rejects_manual_scope_override() -> None:
     response = client.post(
         "/api/github",
         json={
@@ -125,15 +74,10 @@ def test_github_verification_uses_supplied_intent_and_model(monkeypatch, tmp_pat
         },
     )
 
-    assert response.status_code == 200
-    assert captured["ticket"] == "## Out of scope\n- Refund authorization behavior."
-    assert captured["offline"] is False
-    assert captured["source"]["reference"] == "acme/payments#42"
-    assert captured["source"]["intent_source"] == "provided"
-    assert response.json()["model_used"] == "gemini-test"
+    assert response.status_code == 422
 
 
-def test_github_verification_uses_base_repository_policy(monkeypatch, tmp_path) -> None:
+def test_github_verification_uses_repository_scope_comparison(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("CODETRUST_DATA_DIR", str(tmp_path))
     monkeypatch.setattr(
         "codetrust.web.load_pull_request",
@@ -151,16 +95,31 @@ def test_github_verification_uses_base_repository_policy(monkeypatch, tmp_path) 
     )
     captured = {}
     monkeypatch.setattr(
-        "codetrust.web.load_repository_policy",
-        lambda _repo, _sha: RepositoryPolicy(
-            path="CODETRUST.md",
-            content="## Outcome\n- Keep retries safe.\n",
-            sha256="policy-hash",
+        "codetrust.web.resolve_repository_intent",
+        lambda _repo, _sha, _diff, _claim, *, offline: RepositoryIntent(
+            content=(
+                "# Inferred scope from base repository\n\n"
+                "## Outcome\n- Keep retries safe.\n\n"
+                "## In scope\n- Retry behavior.\n"
+            ),
+            source={
+                "intent_source": "repository-inference",
+                "intent_trust": "inferred",
+                "scope_evidence_paths": "README.md, a.py",
+            },
+            comparison=ScopeComparison(
+                repository_purpose="Keep retries safe.",
+                change_summary="Adjust retry behavior.",
+                relationship="aligned",
+                distance=10,
+                differences=("Retry timing changes.",),
+                evidence_paths=("README.md", "a.py"),
+            ),
         ),
     )
 
-    def fake_verify(ticket, _diff, *, offline, source):
-        captured.update(ticket=ticket, offline=offline, source=source)
+    def fake_verify(ticket, _diff, *, offline, source, **kwargs):
+        captured.update(ticket=ticket, offline=offline, source=source, **kwargs)
         return SimpleNamespace(to_dict=lambda: {"run_id": "ct-test", "source": source})
 
     monkeypatch.setattr("codetrust.web.verify_change", fake_verify)
@@ -171,12 +130,18 @@ def test_github_verification_uses_base_repository_policy(monkeypatch, tmp_path) 
     )
 
     assert response.status_code == 200
-    assert captured["ticket"] == "## Outcome\n- Keep retries safe.\n"
-    assert captured["source"]["intent_source"] == "repository-policy"
-    assert captured["source"]["intent_path"] == "CODETRUST.md"
+    assert captured["ticket"].startswith("# Inferred scope")
+    assert captured["source"]["intent_source"] == "repository-inference"
+    assert captured["scope_comparison"].relationship == "aligned"
+    assert captured["scope_comparison"].distance == 10
+    assert captured["change_claim"] == "# Fix timeout\n\nKeep retries idempotent."
 
 
-def test_github_verification_rejects_missing_approved_intent(monkeypatch) -> None:
+def test_github_verification_returns_review_when_repository_evidence_is_insufficient(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    monkeypatch.setenv("CODETRUST_DATA_DIR", str(tmp_path))
     monkeypatch.setattr(
         "codetrust.web.load_pull_request",
         lambda _reference: SimpleNamespace(
@@ -191,12 +156,35 @@ def test_github_verification_rejects_missing_approved_intent(monkeypatch) -> Non
             author="developer",
         ),
     )
-    monkeypatch.setattr("codetrust.web.load_repository_policy", lambda _repo, _sha: None)
+    monkeypatch.setattr(
+        "codetrust.web.resolve_repository_intent",
+        lambda _repo, _sha, _diff, _claim, *, offline: RepositoryIntent(
+            content=(
+                "# Repository scope unavailable\n\n"
+                "## Outcome\n"
+                "- Establish behavior from maintained base-repository evidence.\n"
+            ),
+            source={
+                "intent_source": "insufficient-repository-evidence",
+                "intent_trust": "insufficient",
+                "repository_documents_read": "0",
+            },
+            questions=("Which base document defines expected behavior?",),
+        ),
+    )
 
-    response = client.post("/api/github", json={"reference": "acme/app#7"})
+    response = client.post(
+        "/api/github",
+        json={"reference": "acme/app#7", "model_mode": "disabled"},
+    )
 
-    assert response.status_code == 422
-    assert response.json()["detail"]["code"] == "MISSING_APPROVED_INTENT"
+    assert response.status_code == 200
+    assert response.json()["verdict"] == "NEEDS_REVIEW"
+    assert response.json()["intent"] == "Repository scope not established"
+    assert response.json()["source"]["intent_trust"] == "insufficient"
+    assert response.json()["unresolved_questions"] == [
+        "Which base document defines expected behavior?"
+    ]
 
 
 def test_required_model_failure_returns_explicit_error(monkeypatch) -> None:
@@ -215,7 +203,7 @@ def test_required_model_failure_returns_explicit_error(monkeypatch) -> None:
         ),
     )
     monkeypatch.setattr(
-        "codetrust.web.verify_change",
+        "codetrust.web.resolve_repository_intent",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(
             SynthesisError(
                 "MODEL_TIMEOUT",
@@ -232,7 +220,6 @@ def test_required_model_failure_returns_explicit_error(monkeypatch) -> None:
         "/api/github",
         json={
             "reference": "acme/app#7",
-            "intent": "## Outcome\n- Preserve behavior.\n",
             "model_mode": "required",
         },
     )

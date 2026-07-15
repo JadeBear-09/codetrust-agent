@@ -68,6 +68,7 @@ def analyze_scope(
     ticket: str,
     files: list[ChangedFile],
     interpretations: list[InterpretationClaim] | None = None,
+    scope_trust: str = "trusted",
 ) -> ScopeResult:
     snapshot = parse_intent_snapshot(ticket)
     claims = interpretations or []
@@ -83,6 +84,7 @@ def analyze_scope(
                 continue
             anchor = _anchor(file, clause)
             contradicted_paths.add(file.path)
+            inferred = scope_trust == "inferred"
             alignments.append(
                 ScopeAlignment(
                     status=AlignmentStatus.CONTRADICTED,
@@ -90,23 +92,47 @@ def analyze_scope(
                     path=file.path,
                     line=anchor.line,
                     change_evidence=anchor.text.strip(),
-                    rationale="Changed surface overlaps an explicit out-of-scope product clause.",
+                    rationale=(
+                        "Changed surface overlaps a model-inferred base-repository boundary."
+                        if inferred
+                        else "Changed surface overlaps an explicit out-of-scope product clause."
+                    ),
                 )
             )
-            question = f"Did product owner approve expanding scope beyond: {clause}?"
+            question = (
+                f"Does maintainer confirm inferred boundary: {clause}?"
+                if inferred
+                else f"Did product owner approve expanding scope beyond: {clause}?"
+            )
             questions.append(question)
             findings.append(
                 Finding(
-                    rule_id="CT-SCOPE-001",
-                    title="Change crosses explicit product boundary",
+                    rule_id="CT-SCOPE-INFERRED-001" if inferred else "CT-SCOPE-001",
+                    title=(
+                        "Change conflicts with inferred repository boundary"
+                        if inferred
+                        else "Change crosses explicit product boundary"
+                    ),
                     severity=Severity.HIGH,
-                    confidence=0.9,
+                    confidence=0.65 if inferred else 0.9,
                     path=file.path,
                     line=anchor.line,
                     evidence=anchor.text.strip(),
-                    impact="Technically valid code can implement behavior product did not approve.",
-                    challenge="Where is product-owner approval for this scope expansion?",
-                    suggested_test="Update approved intent or split unrelated behavior into a new task.",
+                    impact=(
+                        "Change may exceed behavior implied by maintained base-repository documents."
+                        if inferred
+                        else "Technically valid code can implement behavior product did not approve."
+                    ),
+                    challenge=(
+                        "Does cited base evidence support treating this inferred boundary as relevant?"
+                        if inferred
+                        else "Where is product-owner approval for this scope expansion?"
+                    ),
+                    suggested_test=(
+                        "Confirm this inferred boundary against additional maintained repository evidence."
+                        if inferred
+                        else "Update explicit scope or split unrelated behavior into a new task."
+                    ),
                     human_question=question,
                     ticket_evidence=clause,
                 )
@@ -123,6 +149,7 @@ def analyze_scope(
             if matching_file is None:
                 continue
             anchor = _anchor(matching_file, clause)
+            inferred = scope_trust == "inferred"
             alignments.append(
                 ScopeAlignment(
                     status=AlignmentStatus.CONTRADICTED,
@@ -130,26 +157,47 @@ def analyze_scope(
                     path=matching_file.path,
                     line=anchor.line,
                     change_evidence=claim.text,
-                    rationale=f"{claim.role.title()} interpretation overlaps forbidden scope.",
+                    rationale=(
+                        f"{claim.role.title()} interpretation overlaps inferred repository scope."
+                        if inferred
+                        else f"{claim.role.title()} interpretation overlaps forbidden scope."
+                    ),
                     actor=claim.role,
                 )
             )
             question = (
-                f"Should product owner accept {claim.role} interpretation, or restore original scope?"
+                f"Does maintainer confirm inferred boundary before accepting {claim.role} interpretation?"
+                if inferred
+                else (
+                    f"Should product owner accept {claim.role} interpretation, "
+                    "or restore original scope?"
+                )
             )
             questions.append(question)
             findings.append(
                 Finding(
-                    rule_id="CT-INTERP-001",
-                    title=f"{claim.role.title()} interpretation conflicts with product intent",
+                    rule_id="CT-INTERP-INFERRED-001" if inferred else "CT-INTERP-001",
+                    title=(
+                        f"{claim.role.title()} interpretation conflicts with inferred scope"
+                        if inferred
+                        else f"{claim.role.title()} interpretation conflicts with product intent"
+                    ),
                     severity=Severity.HIGH,
                     confidence=0.86,
                     path=matching_file.path,
                     line=anchor.line,
                     evidence=claim.text,
                     impact="Review agreement can still authorize wrong business behavior.",
-                    challenge="Which approved product decision changed this boundary?",
-                    suggested_test="Record product-owner decision, revise acceptance criteria, then rerun.",
+                    challenge=(
+                        "Which cited base document supports or contradicts this inferred boundary?"
+                        if inferred
+                        else "Which approved product decision changed this boundary?"
+                    ),
+                    suggested_test=(
+                        "Confirm scope with maintainer or repository evidence, then rerun."
+                        if inferred
+                        else "Record product-owner decision, revise acceptance criteria, then rerun."
+                    ),
                     human_question=question,
                     ticket_evidence=clause,
                 )
@@ -169,7 +217,11 @@ def analyze_scope(
                     path=file.path,
                     line=anchor.line,
                     change_evidence=anchor.text.strip(),
-                    rationale="Changed surface supplies lexical evidence for approved scope.",
+                    rationale=(
+                        "Changed surface supplies lexical evidence for inferred scope."
+                        if scope_trust == "inferred"
+                        else "Changed surface supplies lexical evidence for supplied scope."
+                    ),
                 )
             )
         else:

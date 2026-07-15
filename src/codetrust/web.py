@@ -8,9 +8,10 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from codetrust.agent import verify_change
-from codetrust.github import load_pull_request, load_repository_policy, repository_policy_paths
+from codetrust.github import load_pull_request
 from codetrust.llm import SynthesisError, model_status
 from codetrust.models import InterpretationClaim
+from codetrust.repository_scope import resolve_repository_intent
 from codetrust.run_store import get_run, list_runs, save_run
 from codetrust.scope import parse_intent_snapshot
 from codetrust.ui import DASHBOARD_HTML
@@ -35,13 +36,12 @@ class GitHubRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     reference: str = Field(min_length=3, max_length=500)
-    intent: str = Field(default="", max_length=20_000)
     model_mode: Literal["required", "disabled"] = "required"
 
 
 app = FastAPI(
     title="CodeTrust",
-    version="0.4.0",
+    version="0.6.0",
     description="Evidence-first verification API for software pull requests.",
 )
 
@@ -82,7 +82,7 @@ def run(run_id: str) -> dict:
 @app.post("/api/verify")
 def verify(request: VerifyRequest) -> dict:
     started = time.monotonic()
-    _require_structured_intent(request.ticket)
+    _require_structured_scope(request.ticket)
     try:
         report = verify_change(
             request.ticket,
@@ -109,27 +109,20 @@ def verify_github(request: GitHubRequest) -> dict:
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    supplied_intent = request.intent.strip()
-    policy = None
-    if not supplied_intent:
-        try:
-            policy = load_repository_policy(change.repo, change.base_sha)
-        except (ValueError, RuntimeError) as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-        if policy is None:
-            raise HTTPException(
-                status_code=422,
-                detail={
-                    "code": "MISSING_APPROVED_INTENT",
-                    "message": (
-                        "No approved policy found on the PR base commit. "
-                        "Add CODETRUST.md to the base branch or provide approved intent under Advanced."
-                    ),
-                    "searched_paths": list(repository_policy_paths()),
-                },
-            )
-    approved_intent = supplied_intent or policy.content
-    _require_structured_intent(approved_intent)
+    try:
+        resolution = resolve_repository_intent(
+            change.repo,
+            change.base_sha,
+            change.diff,
+            change.ticket,
+            offline=request.model_mode == "disabled",
+        )
+    except SynthesisError as exc:
+        raise HTTPException(status_code=502, detail=exc.to_dict()) from exc
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    scope_intent = resolution.content
+    _require_structured_scope(scope_intent)
     source = {
         "type": "github-pr",
         "reference": f"{change.repo}#{change.number}",
@@ -140,16 +133,19 @@ def verify_github(request: GitHubRequest) -> dict:
         "author": change.author,
         "base_sha": change.base_sha,
         "head_sha": change.head_sha,
-        "intent_source": "provided" if supplied_intent else "repository-policy",
+        "intent_source": resolution.source["intent_source"],
+        "intent_trust": resolution.source["intent_trust"],
     }
-    if policy is not None:
-        source.update(intent_path=policy.path, intent_sha256=policy.sha256)
+    source.update(resolution.source)
     try:
         report = verify_change(
-            approved_intent,
+            scope_intent,
             change.diff,
             offline=request.model_mode == "disabled",
             source=source,
+            change_claim=change.ticket,
+            additional_questions=list(resolution.questions),
+            scope_comparison=resolution.comparison,
         ).to_dict()
     except SynthesisError as exc:
         raise HTTPException(status_code=502, detail=exc.to_dict()) from exc
@@ -166,7 +162,7 @@ def _save_run(report: dict) -> None:
         return
 
 
-def _require_structured_intent(intent: str) -> None:
+def _require_structured_scope(intent: str) -> None:
     snapshot = parse_intent_snapshot(intent)
     if any(
         (
@@ -180,9 +176,9 @@ def _require_structured_intent(intent: str) -> None:
     raise HTTPException(
         status_code=422,
         detail={
-            "code": "INVALID_APPROVED_INTENT",
+            "code": "INVALID_SCOPE",
             "message": (
-                "Approved intent needs at least one heading: Outcome, In scope, "
+                "Scope needs at least one heading: Outcome, In scope, "
                 "Out of scope, or Acceptance criteria."
             ),
         },

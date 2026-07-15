@@ -3,7 +3,13 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .ruff_cache/
+.mypy_cache/
+.hypothesis/
 .coverage
+htmlcov/
+.DS_Store
+.idea/
+.vscode/
 .env
 dist/
 build/
@@ -12,3 +18,4 @@ reports/**
 !reports/.gitkeep
 .codetrust/
 artifacts/
+/resources/
