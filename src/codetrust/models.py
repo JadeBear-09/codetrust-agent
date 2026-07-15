@@ -18,6 +18,17 @@ class Verdict(StrEnum):
     PASS = "PASS"
 
 
+class SynthesisStatus(StrEnum):
+    COMPLETE = "complete"
+    DISABLED = "disabled"
+
+
+class AlignmentStatus(StrEnum):
+    SUPPORTED = "supported"
+    CONTRADICTED = "contradicted"
+    AMBIGUOUS = "ambiguous"
+
+
 @dataclass(frozen=True)
 class ChangedLine:
     path: str
@@ -54,6 +65,7 @@ class Finding:
     challenge: str
     suggested_test: str
     human_question: str = ""
+    ticket_evidence: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
@@ -84,6 +96,43 @@ class AdversarialTest:
     code: str
 
 
+@dataclass(frozen=True)
+class IntentSnapshot:
+    outcome: tuple[str, ...] = ()
+    in_scope: tuple[str, ...] = ()
+    out_of_scope: tuple[str, ...] = ()
+    acceptance_criteria: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class InterpretationClaim:
+    role: str
+    text: str
+    source: str = ""
+
+
+@dataclass(frozen=True)
+class ScopeAlignment:
+    status: AlignmentStatus
+    clause: str
+    path: str
+    line: int
+    change_evidence: str
+    rationale: str
+    actor: str = "code"
+
+
+@dataclass(frozen=True)
+class ScopeComparison:
+    repository_purpose: str
+    change_summary: str
+    relationship: str
+    distance: int | None
+    differences: tuple[str, ...] = ()
+    evidence_paths: tuple[str, ...] = ()
+    rationale: str = ""
+
+
 @dataclass
 class VerificationReport:
     run_id: str
@@ -101,10 +150,26 @@ class VerificationReport:
     adversarial_tests: list[AdversarialTest] = field(default_factory=list)
     source: dict[str, str] = field(default_factory=dict)
     model_used: str | None = None
+    synthesis_status: SynthesisStatus = SynthesisStatus.DISABLED
+    synthesis_attempts: int = 0
+    synthesis_duration_ms: int = 0
+    synthesis_input_truncated: bool = False
+    duration_ms: int = 0
     evidence_hash: str = ""
+    intent_snapshot: IntentSnapshot | None = None
+    interpretations: list[InterpretationClaim] = field(default_factory=list)
+    alignments: list[ScopeAlignment] = field(default_factory=list)
+    scope_coverage: int | None = None
+    scope_drift: int = 0
+    applicable_checks: list[str] = field(default_factory=list)
+    skipped_checks: list[str] = field(default_factory=list)
+    gate_coverage: int = 0
+    scope_comparison: ScopeComparison | None = None
+    schema_version: int = 3
 
     def to_dict(self) -> dict[str, Any]:
         return {
+            "schema_version": self.schema_version,
             "run_id": self.run_id,
             "created_at": self.created_at,
             "intent": self.intent,
@@ -120,5 +185,21 @@ class VerificationReport:
             "adversarial_tests": [asdict(test) for test in self.adversarial_tests],
             "source": self.source,
             "model_used": self.model_used,
+            "synthesis_status": self.synthesis_status.value,
+            "synthesis_attempts": self.synthesis_attempts,
+            "synthesis_duration_ms": self.synthesis_duration_ms,
+            "synthesis_input_truncated": self.synthesis_input_truncated,
+            "duration_ms": self.duration_ms,
             "evidence_hash": self.evidence_hash,
+            "intent_snapshot": asdict(self.intent_snapshot) if self.intent_snapshot else None,
+            "interpretations": [asdict(item) for item in self.interpretations],
+            "alignments": [
+                {**asdict(item), "status": item.status.value} for item in self.alignments
+            ],
+            "scope_coverage": self.scope_coverage,
+            "scope_drift": self.scope_drift,
+            "applicable_checks": self.applicable_checks,
+            "skipped_checks": self.skipped_checks,
+            "gate_coverage": self.gate_coverage,
+            "scope_comparison": asdict(self.scope_comparison) if self.scope_comparison else None,
         }

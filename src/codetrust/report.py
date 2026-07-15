@@ -27,22 +27,44 @@ def render_markdown(report: VerificationReport) -> str:
     lines = [
         "# CodeTrust evidence report",
         "",
-        f"**Verdict:** {report.verdict.value}",
-        f"**Risk score:** {report.risk_score}/100",
         f"**Run:** `{report.run_id}`",
         f"**Evidence SHA-256:** `{report.evidence_hash}`",
-        "",
-        "## Reconstructed intent",
-        "",
-        report.intent,
-        "",
-        "## Executive summary",
-        "",
-        report.summary,
-        "",
-        "## Evidence-backed findings",
-        "",
     ]
+    if report.scope_comparison:
+        comparison = report.scope_comparison
+        lines.extend(
+            [
+                "",
+                "## Repository-to-PR scope comparison",
+                "",
+                f"- Relationship: **{comparison.relationship.upper()}**",
+                (
+                    f"- Scope distance: **{comparison.distance}/100**"
+                    if comparison.distance is not None
+                    else "- Scope distance: **unscored**"
+                ),
+                f"- Repository baseline: {comparison.repository_purpose}",
+                f"- PR change: {comparison.change_summary}",
+                f"- Rationale: {comparison.rationale}",
+                "- Differences:",
+                *(f"  - {item}" for item in comparison.differences),
+                "- Base evidence:",
+                *(f"  - `{path}`" for path in comparison.evidence_paths),
+            ]
+        )
+    lines.extend(
+        [
+            "",
+            "## Compatibility decision",
+            "",
+            f"- Verdict: **{report.verdict.value}**",
+            f"- Risk score: **{report.risk_score}/100**",
+            f"- Summary: {report.summary}",
+            "",
+            "## Evidence-backed findings",
+            "",
+        ]
+    )
     for index, item in enumerate(report.findings, 1):
         lines.extend(
             [
@@ -51,6 +73,7 @@ def render_markdown(report: VerificationReport) -> str:
                 f"- Location: `{item.path}:{item.line}`",
                 f"- Confidence: {item.confidence:.0%}",
                 f"- Evidence: `{item.evidence}`",
+                *([f"- Product clause: {item.ticket_evidence}"] if item.ticket_evidence else []),
                 f"- Impact: {item.impact}",
                 f"- Challenge: {item.challenge}",
                 f"- Missing proof: {item.suggested_test}",
@@ -59,7 +82,22 @@ def render_markdown(report: VerificationReport) -> str:
         )
     if not report.findings:
         lines.extend(["No deterministic finding. This is not proof of safety.", ""])
-    lines.extend(["## Impact map", ""])
+    lines.extend(
+        [
+            "## Scope alignment",
+            "",
+            (
+                f"- Coverage signal: {report.scope_coverage}%"
+                if report.scope_coverage is not None
+                else "- Coverage signal: not available"
+            ),
+            f"- Drift signal: {report.scope_drift}%",
+        ]
+    )
+    for item in report.alignments:
+        location = f" `{item.path}:{item.line}`" if item.path else ""
+        lines.append(f"- **{item.status.value}**{location}: {item.clause}")
+    lines.extend(["", "## Impact map", ""])
     for area in report.impact_areas:
         paths = ", ".join(f"`{path}`" for path in area.paths)
         lines.append(f"- **{area.name}** ({area.risk}): {paths}")
@@ -76,7 +114,22 @@ def render_markdown(report: VerificationReport) -> str:
         lines.append("- None raised by current gates.")
     lines.extend(["", "## Agent trace", ""])
     lines.extend(f"- `{event.step}` — {event.status}: {event.detail}" for event in report.timeline)
-    lines.extend(["", f"Model: `{report.model_used or 'offline'}`", ""])
+    lines.extend(
+        [
+            "",
+            "## Synthesis",
+            "",
+            f"- Status: `{report.synthesis_status.value}`",
+            f"- Model: `{report.model_used or 'disabled'}`",
+            f"- Attempts: {report.synthesis_attempts}",
+            f"- Duration: {report.synthesis_duration_ms} ms",
+            f"- Input truncated: {'yes' if report.synthesis_input_truncated else 'no'}",
+            f"- Total verification duration: {report.duration_ms} ms",
+            f"- Applicable gates: {len(report.applicable_checks)}",
+            f"- Skipped gates: {len(report.skipped_checks)}",
+            "",
+        ]
+    )
     return "\n".join(lines)
 
 
@@ -147,6 +200,21 @@ def render_html(report: VerificationReport) -> str:
         )
         or '<article class="finding"><h3>No test generated</h3></article>'
     )
+    comparison = report.scope_comparison
+    relationship = comparison.relationship.upper() if comparison else "UNSCORED"
+    distance = str(comparison.distance) if comparison and comparison.distance is not None else "—"
+    purpose = comparison.repository_purpose if comparison else report.intent
+    change_summary = comparison.change_summary if comparison else report.summary
+    differences = (
+        "".join(f"<li>{html.escape(item)}</li>" for item in comparison.differences)
+        if comparison and comparison.differences
+        else "<li>No material difference identified.</li>"
+    )
+    scope_evidence = (
+        "".join(f"<li><code>{html.escape(path)}</code></li>" for path in comparison.evidence_paths)
+        if comparison and comparison.evidence_paths
+        else "<li>No validated path.</li>"
+    )
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>CodeTrust · {report.verdict.value}</title>
@@ -161,11 +229,12 @@ def render_html(report: VerificationReport) -> str:
 @media(max-width:800px){{.hero,.grid{{grid-template-columns:1fr}} h1{{font-size:32px}} .trace li{{grid-template-columns:1fr}} .hash{{display:none}}}}
 </style></head><body><main class="shell">
 <header><div class="brand">Code<i>Trust</i></div><div class="hash">EVIDENCE {report.evidence_hash[:16]}</div></header>
-<section class="hero"><div class="panel"><div class="eyebrow">Reconstructed intent</div><h1>{html.escape(report.intent)}</h1><p class="summary">{html.escape(report.summary)}</p></div><div class="panel"><div class="eyebrow">Decision</div><div class="verdict">{report.verdict.value}</div><div class="score">{report.risk_score}<small>/100</small></div><p>{report.files_changed} files · {len(report.findings)} risks</p></div></section>
+<section class="hero"><div class="panel"><div class="eyebrow">Repository baseline</div><h1>{html.escape(purpose)}</h1><p class="summary"><strong>PR change</strong> {html.escape(change_summary)}</p></div><div class="panel"><div class="eyebrow">Scope relationship</div><div class="verdict">{relationship}</div><div class="score">{distance}<small>/100 distance</small></div><p>{report.verdict.value} · risk {report.risk_score}/100</p></div></section>
+<h2>How PR differs</h2><section class="grid"><div class="panel"><div class="eyebrow">Differences</div><ul>{differences}</ul></div><div class="panel"><div class="eyebrow">Base-repository evidence</div><ul>{scope_evidence}</ul></div></section>
 <h2>Evidence-backed findings</h2><section class="grid">{cards}</section>
 <h2>Impact map</h2><section class="panel"><ol class="trace">{impacts}</ol></section>
 <h2>Generated adversarial tests</h2><section class="grid">{generated}</section>
 <section class="panel" style="margin-top:24px"><div class="eyebrow">Human boundary</div><h2 style="margin-top:8px">Unresolved decisions</h2><ul>{questions}</ul></section>
 <h2>Agent trace</h2><section class="panel"><ol class="trace">{trace}</ol></section>
-<footer>CodeTrust · verification evidence, not automatic approval · model {html.escape(report.model_used or "offline")}</footer>
+<footer>CodeTrust · verification evidence, not automatic approval · model {html.escape(report.model_used or "disabled")} · {report.synthesis_duration_ms} ms</footer>
 </main></body></html>"""

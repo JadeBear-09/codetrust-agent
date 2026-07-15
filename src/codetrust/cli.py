@@ -7,7 +7,9 @@ from pathlib import Path
 
 from codetrust.agent import verify_change
 from codetrust.github import load_pull_request
+from codetrust.llm import SynthesisError
 from codetrust.report import write_reports
+from codetrust.repository_scope import resolve_repository_intent
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -42,25 +44,67 @@ def main(argv: list[str] | None = None) -> int:
     if args.command != "verify":
         return 2
 
-    source = {"type": "diff"}
+    source = {"type": "diff", "intent_trust": "trusted"}
+    change_claim = ""
+    additional_questions: list[str] = []
+    scope_comparison = None
     if args.github_pr:
+        if args.ticket:
+            raise SystemExit("--ticket is not used with --github-pr; repository evidence is automatic")
         change = load_pull_request(args.github_pr)
-        ticket = args.ticket.read_text() if args.ticket else change.ticket
+        change_claim = change.ticket
+        try:
+            resolution = resolve_repository_intent(
+                change.repo,
+                change.base_sha,
+                change.diff,
+                change.ticket,
+                offline=args.offline,
+            )
+        except SynthesisError as exc:
+            print(f"{exc.code}: {exc}", file=sys.stderr)
+            return 2
+        ticket = resolution.content
+        additional_questions = list(resolution.questions)
+        scope_comparison = resolution.comparison
         diff = change.diff
         source = {
             "type": "github-pr",
-            "reference": args.github_pr,
+            "reference": f"{change.repo}#{change.number}",
+            "repo": change.repo,
+            "number": str(change.number),
             "url": change.url,
+            "state": change.state,
+            "author": change.author,
             "base_sha": change.base_sha,
             "head_sha": change.head_sha,
+            "intent_source": resolution.source["intent_source"],
+            "intent_trust": resolution.source["intent_trust"],
         }
+        source.update(resolution.source)
     else:
         if not args.ticket:
             raise SystemExit("--ticket is required with --diff or --git-range")
         ticket = args.ticket.read_text()
         diff = args.diff.read_text() if args.diff else _git_diff(args.repo, args.git_range)
-        source = {"type": "diff" if args.diff else "git-range"}
-    report = verify_change(ticket, diff, offline=args.offline, source=source)
+        source = {
+            "type": "diff" if args.diff else "git-range",
+            "intent_source": "provided",
+            "intent_trust": "trusted",
+        }
+    try:
+        report = verify_change(
+            ticket,
+            diff,
+            offline=args.offline,
+            source=source,
+            change_claim=change_claim,
+            additional_questions=additional_questions,
+            scope_comparison=scope_comparison,
+        )
+    except SynthesisError as exc:
+        print(f"{exc.code}: {exc}", file=sys.stderr)
+        return 2
     paths = write_reports(report, args.output_dir)
     print(
         f"{report.verdict.value} · risk {report.risk_score}/100 · {len(report.findings)} finding(s)"

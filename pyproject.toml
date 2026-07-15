@@ -4,18 +4,34 @@ build-backend = "hatchling.build"
 
 [project]
 name = "codetrust-agent"
-version = "0.2.0"
-description = "Evidence-first verification agent for AI-generated pull requests"
+version = "0.6.0"
+description = "Evidence-first repository understanding for software pull requests"
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "MIT" }
-authors = [{ name = "Talent Hack participant" }]
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "CodeTrust contributors" }]
+keywords = ["pull-request", "code-review", "verification", "software-supply-chain", "ai"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Software Development :: Quality Assurance",
+]
 dependencies = [
   "fastapi>=0.116",
   "openai>=2.0.0",
   "pydantic>=2.11",
+  "python-dotenv>=1.1",
   "uvicorn>=0.35",
 ]
+
+[project.urls]
+Homepage = "https://github.com/JadeBear-09/codetrust-agent"
+Repository = "https://github.com/JadeBear-09/codetrust-agent"
+Issues = "https://github.com/JadeBear-09/codetrust-agent/issues"
 
 [project.optional-dependencies]
 dev = ["pytest>=8.3", "ruff>=0.11"]
@@ -28,9 +44,10 @@ packages = ["src/codetrust"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 addopts = "-q"
 filterwarnings = [
-  "ignore:Using `httpx` with `starlette.testclient` is deprecated:starlette.exceptions.StarletteDeprecationWarning",
+  "ignore:Using `httpx` with `starlette.testclient` is deprecated",
 ]
 
 [tool.ruff]

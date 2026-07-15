@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import shlex
 from collections import defaultdict
 
 from codetrust.models import ChangedFile, ChangedLine
@@ -16,14 +17,17 @@ def parse_unified_diff(text: str) -> list[ChangedFile]:
     current_path: str | None = None
     new_line = 0
     old_line = 0
+    in_hunk = False
 
     for raw in text.splitlines():
         if raw.startswith("diff --git "):
-            parts = raw.split()
+            parts = shlex.split(raw)
             current_path = _clean_path(parts[3]) if len(parts) >= 4 else None
+            in_hunk = False
             continue
-        if raw.startswith("+++ "):
-            current_path = _clean_path(raw[4:].strip())
+        if not in_hunk and raw.startswith("+++ "):
+            path_parts = shlex.split(raw[4:].strip())
+            current_path = _clean_path(path_parts[0]) if path_parts else None
             continue
         if raw.startswith("@@"):
             match = HUNK_RE.match(raw)
@@ -31,8 +35,9 @@ def parse_unified_diff(text: str) -> list[ChangedFile]:
                 new_line = int(match.group(1))
                 old_match = re.match(r"^@@ -(\d+)", raw)
                 old_line = int(old_match.group(1)) if old_match else 0
+                in_hunk = True
             continue
-        if not current_path or raw.startswith(("--- ", "\\ No newline")):
+        if not current_path or not in_hunk or raw.startswith("\\ No newline"):
             continue
         if raw.startswith("+"):
             files[current_path]["added"].append(

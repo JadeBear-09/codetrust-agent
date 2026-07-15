@@ -35,3 +35,19 @@ new file mode 100644
 
     assert files[0].path == "new.py"
     assert [line.line for line in files[0].added] == [1, 2]
+
+
+def test_parses_quoted_paths_and_removed_comment_lines() -> None:
+    diff = '''diff --git "a/src/file name.c" "b/src/file name.c"
+--- "a/src/file name.c"
++++ "b/src/file name.c"
+@@ -4,2 +4,2 @@
+--- old comment
++++ new comment
+'''
+
+    files = parse_unified_diff(diff)
+
+    assert files[0].path == "src/file name.c"
+    assert files[0].removed[0].text == "-- old comment"
+    assert files[0].added[0].text == "++ new comment"
