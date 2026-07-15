@@ -18,6 +18,12 @@ class Verdict(StrEnum):
     PASS = "PASS"
 
 
+class AlignmentStatus(StrEnum):
+    SUPPORTED = "supported"
+    CONTRADICTED = "contradicted"
+    AMBIGUOUS = "ambiguous"
+
+
 @dataclass(frozen=True)
 class ChangedLine:
     path: str
@@ -54,6 +60,7 @@ class Finding:
     challenge: str
     suggested_test: str
     human_question: str = ""
+    ticket_evidence: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
@@ -84,6 +91,32 @@ class AdversarialTest:
     code: str
 
 
+@dataclass(frozen=True)
+class IntentSnapshot:
+    outcome: tuple[str, ...] = ()
+    in_scope: tuple[str, ...] = ()
+    out_of_scope: tuple[str, ...] = ()
+    acceptance_criteria: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class InterpretationClaim:
+    role: str
+    text: str
+    source: str = ""
+
+
+@dataclass(frozen=True)
+class ScopeAlignment:
+    status: AlignmentStatus
+    clause: str
+    path: str
+    line: int
+    change_evidence: str
+    rationale: str
+    actor: str = "code"
+
+
 @dataclass
 class VerificationReport:
     run_id: str
@@ -102,6 +135,11 @@ class VerificationReport:
     source: dict[str, str] = field(default_factory=dict)
     model_used: str | None = None
     evidence_hash: str = ""
+    intent_snapshot: IntentSnapshot | None = None
+    interpretations: list[InterpretationClaim] = field(default_factory=list)
+    alignments: list[ScopeAlignment] = field(default_factory=list)
+    scope_coverage: int | None = None
+    scope_drift: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -121,4 +159,11 @@ class VerificationReport:
             "source": self.source,
             "model_used": self.model_used,
             "evidence_hash": self.evidence_hash,
+            "intent_snapshot": asdict(self.intent_snapshot) if self.intent_snapshot else None,
+            "interpretations": [asdict(item) for item in self.interpretations],
+            "alignments": [
+                {**asdict(item), "status": item.status.value} for item in self.alignments
+            ],
+            "scope_coverage": self.scope_coverage,
+            "scope_drift": self.scope_drift,
         }

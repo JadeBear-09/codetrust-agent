@@ -4,7 +4,14 @@ import json
 import os
 from dataclasses import dataclass
 
+from dotenv import load_dotenv
+
 from codetrust.models import Finding
+
+load_dotenv()
+
+GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
+GEMINI_FALLBACK_MODEL = "gemini-3.1-flash-lite"
 
 
 @dataclass(frozen=True)
@@ -15,21 +22,39 @@ class Synthesis:
     model: str | None
 
 
+def model_status() -> dict[str, str | bool | None]:
+    """Return safe provider metadata without exposing credentials."""
+    provider = _provider_config()
+    if provider is None:
+        return {"configured": False, "provider": None, "model": None}
+    _api_key, base_url, default_model = provider
+    return {
+        "configured": True,
+        "provider": "gemini" if base_url == GEMINI_BASE_URL else "openai",
+        "model": os.getenv("CODETRUST_MODEL", default_model),
+    }
+
+
 def synthesize(ticket: str, diff: str, findings: list[Finding], offline: bool) -> Synthesis:
     fallback = _fallback(ticket, findings)
-    if offline or not os.getenv("OPENAI_API_KEY"):
+    provider = _provider_config()
+    if offline or provider is None:
         return fallback
 
     try:
         from openai import OpenAI
 
-        model = os.getenv("CODETRUST_MODEL", "gpt-5.4")
-        client = OpenAI()
+        api_key, base_url, default_model = provider
+        model = os.getenv("CODETRUST_MODEL", default_model)
+        client = OpenAI(
+            api_key=api_key,
+            base_url=base_url,
+            timeout=20.0,
+            max_retries=2,
+        )
         evidence = [finding.to_dict() for finding in findings]
-        response = client.responses.create(
-            model=model,
-            reasoning={"effort": "medium"},
-            input=[
+        request = {
+            "messages": [
                 {
                     "role": "system",
                     "content": (
@@ -50,8 +75,18 @@ def synthesize(ticket: str, diff: str, findings: list[Finding], offline: bool) -
                     ),
                 },
             ],
-        )
-        parsed = json.loads(_extract_json(response.output_text))
+            "response_format": {"type": "json_object"},
+        }
+        try:
+            response = client.chat.completions.create(model=model, **request)
+        except Exception as exc:
+            fallback_model = os.getenv("CODETRUST_FALLBACK_MODEL", GEMINI_FALLBACK_MODEL)
+            if base_url != GEMINI_BASE_URL or not _transient_provider_error(exc) or model == fallback_model:
+                raise
+            model = fallback_model
+            response = client.chat.completions.create(model=model, **request)
+        content = response.choices[0].message.content or ""
+        parsed = json.loads(_extract_json(content))
         return Synthesis(
             intent=str(parsed.get("intent") or fallback.intent),
             summary=str(parsed.get("summary") or fallback.summary),
@@ -66,6 +101,16 @@ def synthesize(ticket: str, diff: str, findings: list[Finding], offline: bool) -
             unresolved_questions=fallback.unresolved_questions,
             model=None,
         )
+
+
+def _provider_config() -> tuple[str, str | None, str] | None:
+    gemini_key = os.getenv("GEMINI_API_KEY")
+    if gemini_key:
+        return gemini_key, GEMINI_BASE_URL, "gemini-3.5-flash"
+    openai_key = os.getenv("OPENAI_API_KEY")
+    if openai_key:
+        return openai_key, None, "gpt-5.4"
+    return None
 
 
 def _fallback(ticket: str, findings: list[Finding]) -> Synthesis:
@@ -83,3 +128,7 @@ def _extract_json(text: str) -> str:
     if start < 0 or end < start:
         raise ValueError("model response did not contain JSON object")
     return text[start : end + 1]
+
+
+def _transient_provider_error(exc: Exception) -> bool:
+    return getattr(exc, "status_code", None) in {429, 500, 502, 503, 504}

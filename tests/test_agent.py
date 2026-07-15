@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 
 from codetrust.agent import verify_change
-from codetrust.models import Verdict
+from codetrust.models import InterpretationClaim, Verdict
 from codetrust.report import write_reports
 
 
@@ -39,3 +39,43 @@ def test_safe_change_passes() -> None:
 
     assert report.verdict is Verdict.PASS
     assert report.risk_score == 0
+
+
+def test_explicit_business_scope_drift_blocks_change() -> None:
+    ticket = """# Payment retry telemetry
+
+## In scope
+- Emit retry counters for payment reconciliation.
+
+## Out of scope
+- Refund authorization behavior.
+
+## Acceptance criteria
+- Metrics only; refund policy must remain unchanged.
+"""
+    diff = """diff --git a/refunds/authorization.py b/refunds/authorization.py
+--- a/refunds/authorization.py
++++ b/refunds/authorization.py
+@@ -1 +1 @@
+-    return order.age_days <= 30
++    return order.age_days <= 7
+"""
+
+    report = verify_change(
+        ticket,
+        diff,
+        offline=True,
+        interpretations=[
+            InterpretationClaim(
+                role="senior",
+                text="Tighten refund authorization from 30 days to 7 days.",
+                source="review",
+            )
+        ],
+    )
+
+    ids = {finding.rule_id for finding in report.findings}
+    assert report.verdict is Verdict.BLOCK
+    assert {"CT-SCOPE-001", "CT-INTERP-001"} <= ids
+    assert report.scope_drift == 100
+    assert report.unresolved_questions

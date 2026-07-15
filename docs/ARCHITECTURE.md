@@ -6,21 +6,23 @@ Models are strong at reconstructing intent and explaining tradeoffs. Determinist
 
 ## Control flow
 
-1. **Ingest:** read ticket plus local diff, git range, or GitHub pull request.
+1. **Ingest:** read approved intent, role interpretations, and local or GitHub change.
 2. **Map:** parse changed files and exact added or removed line numbers.
-3. **Impact:** map business domains and technical surfaces affected by change.
-4. **Route:** select risk gates based on file types and code signals.
-5. **Challenge:** run deterministic checks and create structured findings.
-6. **Design proof:** generate adversarial test templates for highest risks.
-7. **Synthesize:** use Responses API to summarize intent and open questions; fall back offline.
-8. **Decide:** calculate risk score and verdict from findings, not model opinion.
-9. **Package:** write integrity-hashed JSON, Markdown, test, and visual HTML reports.
+3. **Align:** compare explicit product boundaries with interpretations and changed surfaces.
+4. **Impact:** map business domains and technical surfaces affected by change.
+5. **Route:** select risk gates based on file types and code signals.
+6. **Challenge:** run deterministic checks and create structured findings.
+7. **Design proof:** generate adversarial test templates for highest risks.
+8. **Synthesize:** use Responses API to summarize intent and open questions; fall back offline.
+9. **Decide:** calculate risk score and verdict from findings, not model opinion.
+10. **Package:** write integrity-hashed JSON, Markdown, test, and visual reports.
 
 ## Components
 
 | Component | Responsibility | Trust level |
 |---|---|---|
 | `diff_parser.py` | Changed-file and line evidence | Deterministic |
+| `scope.py` | Structured intent parsing and explicit boundary alignment | Deterministic |
 | `github.py` | Fixed-command PR metadata and diff ingestion | Deterministic boundary |
 | `impact.py` | Business and technical blast-radius map | Deterministic |
 | `rules.py` | Targeted verification checks | Deterministic |
@@ -29,7 +31,9 @@ Models are strong at reconstructing intent and explaining tradeoffs. Determinist
 | `agent.py` | Workflow, scoring, verdict, trace | Deterministic orchestration |
 | `report.py` | Evidence artifacts and dashboard | Deterministic rendering |
 | `cli.py` | Local diff and git-range interface | Constrained tool boundary |
-| `web.py` | FastAPI, request validation, interactive dashboard | Local service boundary |
+| `web.py` | FastAPI, request validation, live PR API | Local service boundary |
+| `ui.py` | Focused PR verification dashboard | Browser boundary |
+| `run_store.py` | Bounded report history without raw ticket or diff | Local persistence |
 
 ## Verdict policy
 

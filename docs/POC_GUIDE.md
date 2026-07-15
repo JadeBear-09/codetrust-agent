@@ -1,96 +1,31 @@
-# POC guide
+# Verification walkthrough
 
-## What to show
+## Live pull request
 
-Show one dangerous AI-generated change that appears plausible. Do not begin with setup or code. Begin with the business problem and verdict.
+1. Start CodeTrust with `python3 start.py`.
+2. Open <http://127.0.0.1:8787>.
+3. Paste real draft pull-request URL.
+4. Paste approved business intent, explicit in-scope behavior, out-of-scope boundaries, and acceptance criteria. Leave blank only when PR description already contains that contract.
+5. Confirm model status says ready when model synthesis is required.
+6. Select **Verify pull request**.
+7. Lead with verdict and score.
+8. Review findings in risk order. Each finding must show file, line, evidence, impact, and suggested verification.
+9. Review human decisions and scope alignment.
+10. Open source PR from result, then close disposable PR in GitHub when finished.
 
-## Five-minute demo script
-
-### 0:00–0:30 — Problem
-
-“Coding agents create more pull requests than senior engineers can safely inspect. CodeTrust is the verification firewall between those agents and production.”
-
-### 0:30–1:00 — Input
-
-Open `demo/tickets/payment-reconciliation.md` and state three requirements: safe retries, old market compatibility, safe rollback. Briefly show `demo/patches/risky-payment.diff`. Point out that code looks reasonable and has a success test.
-
-### 1:00–1:30 — Run
-
-```bash
-make serve
-```
-
-Open `http://127.0.0.1:8787`, load demo, then run verification. Keep `make demo-offline` and generated HTML ready as fallback.
-
-For strongest live demo, use **GitHub PR** tab with:
-
-- `JadeBear-09/codetrust-agent#2` — risky candidate.
-- `JadeBear-09/codetrust-agent#3` — remediated candidate.
-
-### 1:30–3:10 — Evidence
-
-Lead with `BLOCK 100/100`. Open these findings in order:
-
-1. Duplicate-payment risk: retry lacks idempotency proof.
-2. Async blocking network call.
-3. Removed `market` field breaks old adapter contract.
-4. Migration has no rollback.
-5. Success-only test coverage.
-
-For each, show exact source evidence and proposed adversarial test. Do not read every card.
-
-### 3:10–4:00 — Agent behavior
-
-Show scope, impact, challenge, test design, intent reconstruction, and decision. Explain that gates decide facts while model reconstructs intent and uncertainty. This prevents model confidence from becoming approval.
-
-Run executable proof:
+## Offline recovery
 
 ```bash
-make proof
+make demo-offline
+open reports/latest.html
 ```
 
-Point to `assert 2 == 1`: one timeout caused two provider-side payment effects.
-
-### 4:00–4:30 — Remediation comparison
-
-Analyze PR `#3`. Show risk changing from `BLOCK 94/100` to `PASS 0/100` while critical impact areas remain visible. Explain that impact is not failure; missing proof creates failure.
-
-### 4:30–4:45 — Human boundary
-
-Show one unresolved question: which business key defines payment idempotency across markets? Explain that CodeTrust automates proof collection but preserves business ownership.
-
-### 4:45–5:00 — Close
-
-“CodeTrust lets engineering agents scale without turning senior engineers into full-time AI code inspectors.”
-
-## Setup checklist
-
-- Use Python 3.11 or newer.
-- Install `uv`.
-- Run `uv sync --extra dev`.
-- Run `make test` and `make lint`.
-- Run both `make demo-offline` and `make demo` before event.
-- Run `make proof` and confirm expected failure evidence.
-- Run dashboard and API health check.
-- Build Docker image if Docker is available.
-- Keep generated HTML open in a browser tab.
-- Keep terminal font large and notifications disabled.
-- Keep a screenshot and 90-second video as backup.
-
-## Live recovery
-
-| Failure | Recovery |
-|---|---|
-| API error | Run `make demo-offline` and explain deterministic fallback |
-| Network loss | Use already-generated `reports/latest.html` |
-| Dependency issue | Use committed lockfile and `uv sync` |
-| Browser problem | Open `reports/latest.md` |
-| Judge asks if scripted | Run a second unseen diff through CLI |
+Offline fixture proves deterministic pipeline without network or provider key. Website never loads it automatically.
 
 ## What not to claim
 
 - Do not claim replacement of engineers.
-- Do not claim proof of universal safety.
-- Do not claim current rules support every language.
+- Do not claim universal safety.
 - Do not call model-generated prose evidence.
-- Do not hide that demo defects are seeded.
+- Do not claim support for languages or risks without configured gates.
+- Do not say CodeTrust merges, deploys, closes, or executes pull-request code.

@@ -51,6 +51,7 @@ def render_markdown(report: VerificationReport) -> str:
                 f"- Location: `{item.path}:{item.line}`",
                 f"- Confidence: {item.confidence:.0%}",
                 f"- Evidence: `{item.evidence}`",
+                *([f"- Product clause: {item.ticket_evidence}"] if item.ticket_evidence else []),
                 f"- Impact: {item.impact}",
                 f"- Challenge: {item.challenge}",
                 f"- Missing proof: {item.suggested_test}",
@@ -59,7 +60,22 @@ def render_markdown(report: VerificationReport) -> str:
         )
     if not report.findings:
         lines.extend(["No deterministic finding. This is not proof of safety.", ""])
-    lines.extend(["## Impact map", ""])
+    lines.extend(
+        [
+            "## Scope alignment",
+            "",
+            (
+                f"- Coverage signal: {report.scope_coverage}%"
+                if report.scope_coverage is not None
+                else "- Coverage signal: not available"
+            ),
+            f"- Drift signal: {report.scope_drift}%",
+        ]
+    )
+    for item in report.alignments:
+        location = f" `{item.path}:{item.line}`" if item.path else ""
+        lines.append(f"- **{item.status.value}**{location}: {item.clause}")
+    lines.extend(["", "## Impact map", ""])
     for area in report.impact_areas:
         paths = ", ".join(f"`{path}`" for path in area.paths)
         lines.append(f"- **{area.name}** ({area.risk}): {paths}")

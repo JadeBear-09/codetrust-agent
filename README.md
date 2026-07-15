@@ -1,142 +1,174 @@
 # CodeTrust
 
-> Coding agents create pull requests. CodeTrust decides which pull requests deserve human attention.
+[![CI](https://github.com/JadeBear-09/codetrust-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/JadeBear-09/codetrust-agent/actions/workflows/ci.yml)
 
-CodeTrust is an evidence-first verification agent for AI-generated software changes. It reconstructs intent, maps changed surfaces, runs targeted risk gates, challenges unsafe assumptions, and produces a traceable evidence pack. Humans receive unresolved decisions instead of a second generic code review.
+CodeTrust is an evidence-first verification agent for software pull requests. It compares approved intent with a live GitHub diff, runs deterministic risk gates, and returns a traceable `BLOCK`, `NEEDS_REVIEW`, or `PASS` verdict.
 
-Version 0.2 adds real GitHub pull-request ingestion, domain-impact mapping, adversarial test generation, executable failure proof, FastAPI endpoints, responsive dashboard, and non-root container packaging.
+CodeTrust does not merge, deploy, close, or execute pull-request code.
 
-## Why this exists
-
-Coding agents scale code output faster than senior engineers can scale review. A change can pass ordinary tests yet remain architecturally unsafe: blocking I/O in async code, duplicate payment retries, broken contracts, or rollback gaps. CodeTrust sits between code generation and production.
-
-## Killer demo
-
-An agent-generated payment reconciliation change looks reasonable and includes a passing success test. CodeTrust finds five risks:
-
-1. Blocking network I/O inside an async path.
-2. Retried payment action without idempotency proof.
-3. Removed API field that can break older market adapters.
-4. Database migration without rollback.
-5. No failure-path test coverage.
-
-Result: `BLOCK`, evidence for every claim, and one business decision for a human.
-
-## Run in two minutes
-
-Requirements: Python 3.11+ and [uv](https://docs.astral.sh/uv/).
-
-```bash
-uv sync --extra dev
-make demo-offline
-make proof
-make serve
-```
-
-Open [http://127.0.0.1:8787](http://127.0.0.1:8787), select **Load demo**, then run verification.
-
-Generated evidence remains available without server:
-
-```bash
-open reports/latest.html
-```
-
-AI-assisted intent reconstruction:
-
-```bash
-export OPENAI_API_KEY="..."
-make demo
-```
-
-CodeTrust uses `gpt-5.4` by default through OpenAI Responses API. Override with `CODETRUST_MODEL`.
-
-## Verify a real branch
-
-```bash
-uv run codetrust verify \
-  --ticket path/to/ticket.md \
-  --repo path/to/repository \
-  --git-range main...HEAD \
-  --output-dir reports
-```
-
-Verify a real GitHub pull request through authenticated GitHub CLI:
-
-```bash
-uv run codetrust verify \
-  --github-pr OWNER/REPOSITORY#123 \
-  --offline \
-  --output-dir reports
-```
-
-Reproduce live before/after demonstration from this private repository:
-
-```bash
-# Intentionally risky candidate: expected BLOCK 94/100
-uv run codetrust verify --github-pr JadeBear-09/codetrust-agent#2 --offline
-
-# Remediated candidate: expected PASS 0/100
-uv run codetrust verify --github-pr JadeBear-09/codetrust-agent#3 --offline
-```
-
-Artifacts:
-
-- `latest.html`: visual decision dashboard for demo and judges.
-- `latest.md`: review-ready evidence report.
-- `latest.json`: integrity-hashed, machine-readable policy-gate output.
-- `adversarial-tests.md`: generated proof templates for top findings.
-
-Exit code is `1` for `BLOCK`, enabling CI enforcement.
-
-## Architecture
+## Product workflow
 
 ```text
-Ticket + diff / GitHub PR
-    │
-    ├─ Scope mapper ── changed files and line evidence
-    ├─ Impact mapper ── business and technical blast radius
-    ├─ Risk router ── selects relevant verification gates
-    ├─ Challenge engine ── deterministic safety rules
-    ├─ Test designer ── generates adversarial proof
-    └─ Intent synthesizer ── model or offline fallback
-              │
-              ▼
-       Evidence + risk score
-              │
-              ▼
-      BLOCK / NEEDS_REVIEW / PASS
-              │
-              ├─ HTML dashboard
-              ├─ Markdown report
-              └─ JSON policy output
+Approved intent + GitHub pull request
+                  │
+                  ▼
+        Scope and impact mapping
+                  │
+                  ▼
+       Deterministic risk gates
+                  │
+                  ▼
+        Optional model synthesis
+                  │
+                  ▼
+ BLOCK / NEEDS_REVIEW / PASS + evidence
 ```
 
-Deterministic checks own factual evidence. Model owns intent synthesis and explanation. This boundary prevents eloquent model output from becoming unverified proof.
+Every finding includes file, line, evidence, impact, and suggested verification. Model output can explain deterministic findings but cannot change verdict evidence or score.
 
-## Current POC boundary
+## Run locally
 
-- Input is a local unified diff or git range.
-- GitHub PR input requires authenticated `gh` CLI.
-- Five deterministic rules cover demo-critical risks.
-- CodeTrust does not merge or deploy.
-- It does not execute commands found inside tickets or diffs.
-- Generated tests are templates; one dedicated demo test is executable through `make proof`.
-- `PASS` means no configured gate blocked the change; it never means “proven safe.”
+Requirements:
 
-See [Talent Hack strategy](docs/TALENT_HACK_STRATEGY.md), [measured demo results](docs/DEMO_RESULTS.md), [POC guide](docs/POC_GUIDE.md), [architecture](docs/ARCHITECTURE.md), [delivery plan](docs/PLAN.md), [research](docs/RESEARCH.md), [security](SECURITY.md), and [submission draft](docs/SUBMISSION.md).
-
-## Container
+- Python 3.11 or newer
+- Authenticated [GitHub CLI](https://cli.github.com/) for private pull requests
 
 ```bash
-docker build -t codetrust .
-docker run --rm -p 8787:8787 codetrust
+git clone https://github.com/JadeBear-09/codetrust-agent.git
+cd codetrust-agent
+gh auth login
+python3 start.py
 ```
+
+Open <http://127.0.0.1:8787>. Paste a full GitHub pull-request URL, optionally provide approved intent, and select **Verify pull request**.
+
+`start.py` installs dependencies and starts the application. It does not load or execute sample data.
+
+Useful commands:
+
+```bash
+python3 start.py --setup-only
+python3 start.py --check
+python3 start.py --no-open
+```
+
+## Gemini configuration
+
+Copy environment template and add Gemini key:
+
+```bash
+cp .env.example .env
+```
+
+```dotenv
+GEMINI_API_KEY=your_key
+CODETRUST_MODEL=gemini-3.5-flash
+CODETRUST_FALLBACK_MODEL=gemini-3.1-flash-lite
+```
+
+Secrets remain in backend environment. Browser receives only safe provider name, model name, and configured/unconfigured status.
+
+Transient provider failures are retried. Gemini high-demand failures fall back to configured stable fallback model; report records exact model used.
+
+OpenAI-compatible configuration is also supported:
+
+```dotenv
+OPENAI_API_KEY=your_key
+CODETRUST_MODEL=gpt-5.4
+```
+
+Without a provider key, deterministic verification still works in offline mode.
+
+## Verify from CLI
+
+Live pull request:
+
+```bash
+uv run codetrust verify \
+  --github-pr https://github.com/OWNER/REPOSITORY/pull/123 \
+  --ticket path/to/approved-scope.md \
+  --output-dir reports
+```
+
+Use PR description as intent by omitting `--ticket`:
+
+```bash
+uv run codetrust verify --github-pr OWNER/REPOSITORY#123
+```
+
+Local diff:
+
+```bash
+uv run codetrust verify \
+  --ticket path/to/approved-scope.md \
+  --diff path/to/change.diff \
+  --offline
+```
+
+Generated artifacts:
+
+- `latest.html` — human decision view
+- `latest.md` — review-ready report
+- `latest.json` — hashed machine-readable result
+- `adversarial-tests.md` — suggested verification cases
+
+Exit code `1` means `BLOCK`, suitable for CI policy gates.
+
+## API
+
+- `GET /api/health` — service health
+- `GET /api/config` — safe provider configuration status
+- `POST /api/github` — verify live GitHub PR
+- `POST /api/verify` — verify supplied intent and unified diff
+- `GET /api/runs` — bounded local verification history
+- `GET /api/runs/{run_id}` — stored report
+- `GET /docs` — OpenAPI documentation
+
+Example request:
+
+```bash
+curl http://127.0.0.1:8787/api/github \
+  -H 'content-type: application/json' \
+  -d '{
+    "reference":"https://github.com/OWNER/REPOSITORY/pull/123",
+    "intent":"## Out of scope\n- Billing policy changes",
+    "offline":false
+  }'
+```
+
+## Draft-PR verification workflow
+
+Create a disposable draft PR, paste its URL into CodeTrust, inspect verdict, then close it in GitHub. CodeTrust intentionally never mutates PR state.
+
+See [draft PR workflow](docs/DRAFT_PR_WORKFLOW.md) for exact commands.
+
+## Offline fixture
+
+Repository keeps one deterministic offline fixture for development and recovery:
+
+```bash
+make demo-offline
+```
+
+Website never loads fixture automatically.
+
+## Safety boundary
+
+- Ticket, diff, PR metadata, and model output are untrusted data.
+- GitHub ingestion uses fixed `gh` command arguments without shell execution.
+- Pull-request code is fetched as diff and never checked out or executed.
+- API keys remain in ignored `.env` files.
+- Stored run history contains reports, not raw ticket or diff content.
+- `PASS` means configured gates found no blocker; it does not prove universal safety.
+
+See [SECURITY.md](SECURITY.md) and [architecture](docs/ARCHITECTURE.md).
 
 ## Development
 
 ```bash
-make test
-make lint
+uv sync --extra dev
+uv run pytest
+uv run ruff check .
 ```
 
 ## License

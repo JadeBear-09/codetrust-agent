@@ -4,16 +4,17 @@ build-backend = "hatchling.build"
 
 [project]
 name = "codetrust-agent"
-version = "0.2.0"
+version = "0.3.0"
 description = "Evidence-first verification agent for AI-generated pull requests"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
-authors = [{ name = "Talent Hack participant" }]
+authors = [{ name = "CodeTrust contributors" }]
 dependencies = [
   "fastapi>=0.116",
   "openai>=2.0.0",
   "pydantic>=2.11",
+  "python-dotenv>=1.1",
   "uvicorn>=0.35",
 ]
 
@@ -28,9 +29,10 @@ packages = ["src/codetrust"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 addopts = "-q"
 filterwarnings = [
-  "ignore:Using `httpx` with `starlette.testclient` is deprecated:starlette.exceptions.StarletteDeprecationWarning",
+  "ignore:Using `httpx` with `starlette.testclient` is deprecated",
 ]
 
 [tool.ruff]
