@@ -1,0 +1,124 @@
+{
+  "version": 1,
+  "event_search": {
+    "keyword": "football",
+    "country_code": "DE",
+    "classification_name": "sports",
+    "size": 10,
+    "default_venue_capacity": 52000,
+    "expected_occupancy": 0.92
+  },
+  "simulation": {
+    "seed": 781,
+    "clock_ratio": 60,
+    "connected_user_ratio": 0.045,
+    "average_user_demand_mbps": 1.68,
+    "device_limit_mbps": 50.0,
+    "base_latency_ms": 18.0,
+    "congestion_soft_start_pct": 76.0,
+    "snapshot_minutes": [-120, -60, -30, -15, 0],
+    "arrival_curve": [
+      {"relative_minute": -120, "fraction": 0.05},
+      {"relative_minute": -60, "fraction": 0.35},
+      {"relative_minute": -30, "fraction": 0.70},
+      {"relative_minute": 0, "fraction": 0.95},
+      {"relative_minute": 60, "fraction": 0.98},
+      {"relative_minute": 120, "fraction": 0.98},
+      {"relative_minute": 145, "fraction": 0.18}
+    ],
+    "traffic_spikes": [
+      {"relative_minute": -15, "width_minutes": 8, "multiplier": 1.08},
+      {"relative_minute": 0, "width_minutes": 8, "multiplier": 1.12},
+      {"relative_minute": 60, "width_minutes": 10, "multiplier": 1.16},
+      {"relative_minute": 120, "width_minutes": 12, "multiplier": 1.20}
+    ]
+  },
+  "cells": [
+    {
+      "cell_id": "CELL-A",
+      "label": "Residential",
+      "site_id": "SITE-RESIDENTIAL-01",
+      "latitude_offset": 0.011,
+      "longitude_offset": -0.008,
+      "radio_capacity_mbps": 2400.0,
+      "backhaul_capacity_mbps": 4200.0,
+      "baseline_users": 190,
+      "event_share": 0.17,
+      "base_handover_success_pct": 99.2,
+      "base_drop_rate_pct": 0.08,
+      "software_version": "RAN-24.7",
+      "config_version": 1842
+    },
+    {
+      "cell_id": "CELL-B",
+      "label": "Rail station",
+      "site_id": "SITE-STATION-01",
+      "latitude_offset": -0.009,
+      "longitude_offset": 0.012,
+      "radio_capacity_mbps": 2450.0,
+      "backhaul_capacity_mbps": 4300.0,
+      "baseline_users": 220,
+      "event_share": 0.11,
+      "base_handover_success_pct": 99.1,
+      "base_drop_rate_pct": 0.09,
+      "software_version": "RAN-24.7",
+      "config_version": 1842
+    },
+    {
+      "cell_id": "CELL-C",
+      "label": "Stadium",
+      "site_id": "SITE-STADIUM-01",
+      "latitude_offset": 0.0,
+      "longitude_offset": 0.0,
+      "radio_capacity_mbps": 3200.0,
+      "backhaul_capacity_mbps": 5000.0,
+      "baseline_users": 150,
+      "event_share": 0.72,
+      "base_handover_success_pct": 99.0,
+      "base_drop_rate_pct": 0.10,
+      "software_version": "RAN-24.7",
+      "config_version": 1842
+    }
+  ],
+  "policy": {
+    "telemetry_max_age_seconds": 60,
+    "congestion_threshold_pct": 80.0,
+    "sustained_window_points": 2,
+    "donor_prb_limit_pct": 75.0,
+    "target_prb_pct": 78.0,
+    "minimum_offload_pct": 5,
+    "maximum_offload_pct": 12,
+    "canary_pct": 5,
+    "minimum_handover_success_pct": 97.0,
+    "maximum_session_drop_rate_pct": 1.0,
+    "maximum_latency_p95_ms": 100.0,
+    "change_window_open": true
+  },
+  "scenarios": [
+    {
+      "id": "normal",
+
+      "label": "Normal congestion",
+      "description": "Guarded canary expands and KPIs recover.",
+      "faults": {}
+    },
+    {
+      "id": "stale_telemetry",
+      "label": "Stale telemetry",
+      "description": "Old evidence must block every controller write.",
+      "faults": {"telemetry_age_seconds": 120}
+    },
+    {
+      "id": "duplicate_request",
+      "label": "Duplicate request",
+      "description": "Same proposal is delivered twice; second delivery is a no-op.",
+      "faults": {"duplicate_delivery": true}
+    },
+    {
+      "id": "donor_deterioration",
+      "label": "Donor deteriorates",
+      "description": "Rail-station surge breaches rollback conditions after canary.",
+      "faults": {"donor_extra_users": 1150, "handover_penalty_pct": 2.3}
+    }
+  ]
+}

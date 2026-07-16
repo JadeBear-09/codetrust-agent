@@ -1,0 +1,12 @@
+[
+  {
+    "incident_id": "ran-capacity-congestion",
+    "expected_root_cause_code": "capacity_congestion",
+    "expected_safe_to_plan": true
+  },
+  {
+    "incident_id": "credential-stuffing-attack",
+    "expected_root_cause_code": "credential_attack",
+    "expected_safe_to_plan": false
+  }
+]

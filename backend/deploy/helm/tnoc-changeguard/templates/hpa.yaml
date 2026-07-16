@@ -1,0 +1,26 @@
+{{- $root := . -}}
+{{- range $component, $settings := .Values.autoscaling }}
+{{- if and $settings.enabled (index $root.Values.components $component).enabled }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "tnoc.fullname" $root }}-{{ $component }}
+  labels:
+    {{- include "tnoc.labels" $root | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "tnoc.fullname" $root }}-{{ $component }}
+  minReplicas: {{ $settings.minReplicas }}
+  maxReplicas: {{ $settings.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ $settings.targetCPUUtilizationPercentage }}
+{{- end }}
+{{- end }}

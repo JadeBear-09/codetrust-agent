@@ -1,0 +1,120 @@
+image:
+  repository: ""
+  tag: ""
+  pullPolicy: IfNotPresent
+
+secretRef: ""
+migrationSecretRef: ""
+imagePullSecrets: []
+
+service:
+  port: 80
+  targetPort: 8000
+
+components:
+  api:
+    enabled: true
+    secretRef: ""
+    command: tnoc-api
+    replicas: 2
+    resources:
+      requests: { cpu: 250m, memory: 384Mi }
+      limits: { cpu: "1", memory: 1Gi }
+  worker:
+    enabled: true
+    secretRef: ""
+    command: tnoc-worker
+    replicas: 2
+    resources:
+      requests: { cpu: 500m, memory: 768Mi }
+      limits: { cpu: "2", memory: 2Gi }
+  outbox:
+    enabled: true
+    secretRef: ""
+    command: tnoc-outbox
+    replicas: 2
+    resources:
+      requests: { cpu: 100m, memory: 192Mi }
+      limits: { cpu: 500m, memory: 512Mi }
+
+autoscaling:
+  api:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 20
+    targetCPUUtilizationPercentage: 65
+  worker:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 50
+    targetCPUUtilizationPercentage: 70
+
+podDisruptionBudget:
+  minAvailable: 1
+
+networkPolicy:
+  enabled: true
+  ingressNamespaceSelector:
+    matchLabels:
+      network-policy.tnoc-changeguard/ingress: "true"
+  # Empty by design: production install remains fail-closed until operator-specific
+  # database, Kafka, Redis, Qdrant, OIDC, model, telemetry, and controller egress is declared.
+  egress: []
+
+env:
+  ENVIRONMENT: production
+  LOG_LEVEL: INFO
+  API_HOST: 0.0.0.0
+  API_PORT: "8000"
+  KAFKA_CONSUMER_GROUP: tnoc-changeguard
+  TELEMETRY_TOPIC: tnoc.telemetry.v1
+  INCIDENT_TOPIC: tnoc.incident.v1
+  DECISION_TOPIC: tnoc.decision.v1
+  KNOWLEDGE_TOPIC: tnoc.knowledge.v1
+  EVENT_STREAM_CHANNEL: tnoc.dashboard.v1
+  SSE_HEARTBEAT_SECONDS: "15"
+  OUTBOX_POLL_INTERVAL_SECONDS: "0.5"
+  OUTBOX_BATCH_SIZE: "100"
+  WORKER_RETRY_DELAY_SECONDS: "1"
+  WORKER_RETRY_BACKOFF_MULTIPLIER: "2"
+  WORKER_RETRY_MAX_DELAY_SECONDS: "30"
+  WORKER_MAX_ATTEMPTS: "5"
+  KAFKA_AUTO_OFFSET_RESET: earliest
+  DEAD_LETTER_TOPIC: tnoc.dead-letter.v1
+  DATABASE_POOL_RECYCLE_SECONDS: "1800"
+  CORRELATION_WINDOW_SECONDS: "300"
+  CORRELATION_MIN_EVENT_COUNT: "2"
+  DASHBOARD_WINDOW_SECONDS: "86400"
+  DASHBOARD_RATE_WINDOW_SECONDS: "60"
+  DASHBOARD_INCIDENT_LIMIT: "50"
+  LLM_PROVIDER: openai
+  LLM_MODEL: gpt-5.6-terra
+  LLM_REASONING_EFFORT: medium
+  OPENAI_STORE: "false"
+  EMBEDDING_PROVIDER: openai
+  EMBEDDING_MODEL: text-embedding-3-large
+  RAG_ENABLED: "true"
+  QDRANT_COLLECTION: tnoc-knowledge
+  RAG_CHUNK_CHARACTERS: "2400"
+  RAG_CHUNK_OVERLAP_CHARACTERS: "300"
+  RAG_RESULT_LIMIT: "8"
+  PROMPT_DIRECTORY: prompts
+  SPECIALIST_NAMES: '["telemetry","topology","change_history","security"]'
+  TOOL_CATALOG_PATH: config/tools.json
+  POLICY_PATH: config/policy.json
+  OIDC_REQUIRED: "true"
+  HTTP_TOOL_CONNECT_TIMEOUT_SECONDS: "3"
+  HTTP_TOOL_READ_TIMEOUT_SECONDS: "30"
+  MAX_TOOL_RESPONSE_BYTES: "1048576"
+  MAX_INGEST_PAYLOAD_BYTES: "1048576"
+  MAX_KNOWLEDGE_DOCUMENT_BYTES: "10485760"
+  MAX_OBSERVATION_FUTURE_SKEW_SECONDS: "300"
+  MAX_CONTEXT_EVENTS: "500"
+  MAX_CONTEXT_EVIDENCE: "1000"
+  OTEL_SERVICE_NAME: tnoc-changeguard
+  OTEL_EXPORTER_OTLP_INSECURE: "false"
+  OTEL_TRACE_SAMPLE_RATIO: "0.1"
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

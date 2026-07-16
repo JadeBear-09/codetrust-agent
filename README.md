@@ -2,6 +2,8 @@
 
 **Evidence gate for autonomous telecom changes, powered by six live Gemini roles.**
 
+[![CI](https://github.com/JadeBear-09/codetrust-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/JadeBear-09/codetrust-agent/actions/workflows/ci.yml)
+
 Autonomous RAN agents can detect congestion and propose changes within seconds. Detection alone does
 not justify changing a live network. ChangeGuard sits between a proposing agent and network
 controller, independently testing whether each proposed change is supported, bounded, observable,
@@ -9,108 +11,163 @@ and reversible before an operator approves it.
 
 > RAN agents propose changes. ChangeGuard decides whether those changes are safe and justified.
 
-## Problem
-
-A telecom change depends on evidence that should not be blended prematurely:
-
-- telemetry proves whether degradation is real;
-- topology constrains where traffic or capacity can move;
-- change history tests whether another deployment caused symptoms;
-- security and demand context distinguish attacks from legitimate load.
-
-One generalist response can mix these sources, invent support, or overreach. ChangeGuard assigns each
-domain to a source-isolated specialist, then makes evidence handoffs visible.
-
-## End-to-end mission
+## How it works
 
 ```mermaid
 flowchart LR
-    R["RAN agent proposal"] --> G["ChangeGuard evidence gate"]
-    G --> T["Telemetry specialist"]
-    G --> O["Topology specialist"]
-    G --> C["Change-history specialist"]
-    G --> S["Security and demand specialist"]
-    T --> A["Gemini adjudicator"]
-    O --> A
-    C --> A
-    S --> A
-    A --> P["Gemini response planner"]
-    P --> H["Operator approval"]
-    H -. "outside prototype" .-> N["Network controller"]
+  R["RAN agent proposal"] --> G["ChangeGuard evidence gate"]
+  G --> T["Telemetry specialist"]
+  G --> O["Topology specialist"]
+  G --> C["Change-history specialist"]
+  G --> S["Security and demand specialist"]
+  T --> A["Gemini adjudicator"]
+  O --> A
+  C --> A
+  S --> A
+  A --> P["Gemini response planner"]
+  P --> U["Operator recommendation + proof log"]
+  U -. "human approval; outside prototype" .-> N["Network controller"]
 ```
 
-1. RAN workflow submits incident evidence and proposed action.
-2. Four Gemini specialists run concurrently, each receiving only its authorised source.
-3. Gemini adjudicator receives specialist findings and selects supported root cause.
-4. Gemini response planner returns bounded recommendation, success signals, stop conditions, and
-   rollback triggers.
-5. Operator reviews decision. Prototype never executes network change.
+Four source-isolated specialists run concurrently. Adjudicator receives only validated specialist
+findings, then planner creates bounded response. Every handoff appears in chronological JSONL log.
 
-No preset verdict, expected-answer lookup, cached response, or controller fallback chooses result.
-Schema, citation-scope, and resource-scope checks validate model output without deciding outcome.
+See [architecture.md](architecture.md) for contracts, sequencing, trust boundaries, and failure
+semantics.
 
-## Demonstrated incident
+## Decision guarantees
 
-Three cells near stadium sustain approximately 93% utilisation with rising packet loss. RAN agent
-proposes temporary capacity reallocation. ChangeGuard independently checks:
+- Six live Gemini calls run for each mission.
+- Each specialist sees only its authorised evidence source.
+- Gemini owns findings, root-cause selection, confidence, and recommendation.
+- Schema, citation-provenance, and resource-scope checks can reject output but never choose verdict.
+- Model failure or provenance violation fails mission visibly; no canned fallback runs.
+- Credentials and hidden system prompts never enter mission log.
+- Recommendation remains advisory. Prototype has no production controller connection.
 
-| Evidence | Question answered |
+## Demonstrated RAN incident
+
+Three stadium cells sustain high utilisation and packet loss. RAN workflow proposes temporary
+capacity reallocation. ChangeGuard validates proposal against:
+
+| Evidence domain | Question |
 |---|---|
 | Telemetry | Is congestion current, sustained, and service-affecting? |
 | Topology | Is proposed shift compatible with dependency and capacity limits? |
 | Change history | Could recent deployment explain degradation instead? |
 | Security / demand | Does traffic resemble attack or legitimate event demand? |
 
-Supported outcome remains advisory: apply only within approved capacity boundary, observe defined
-KPIs, stop on guardrail breach, and roll back when recovery conditions fail.
+Supported result still requires operator approval, success KPIs, observation window, stop conditions,
+and rollback triggers.
 
-## Why six Gemini roles?
+## Repository layout
 
-| Role | Evidence boundary | Responsibility |
-|---|---|---|
-| Telemetry specialist | Metrics only | Identify symptoms, trends, and candidate causes |
-| Topology specialist | Topology only | Validate scope, dependencies, and movement limits |
-| Change-history specialist | Deployment records only | Test temporal causality |
-| Security/demand specialist | Threat and demand signals only | Separate hostile from legitimate load |
-| Adjudicator | Four signed findings | Select root cause, confidence, and supporting citations |
-| Response planner | Adjudicated result | Define safe action envelope and operator controls |
+```text
+app/                       Next.js operator console and API proxies
+backend/src/tnoc/          Mission orchestration, validation, APIs, and safety controls
+backend/prompts/           Versioned specialist, adjudicator, and planner instructions
+backend/examples/          Local telecom incident and event fixtures
+backend/tests/             Unit and safety regression tests
+backend/deploy/            Docker, Helm, NetworkPolicy, and observability resources
+docs/                      Operations, threat model, and proof notes
+architecture.md            End-to-end architecture and decision contracts
+```
 
-Specialists cannot see or alter each other's conclusions. Adjudicator waits for all findings.
-Planner starts only after adjudication.
+## Requirements
 
-## Inspectability
+- Node.js 22.13 or newer
+- Python 3.12 or newer
+- [uv](https://docs.astral.sh/uv/)
+- Gemini API key for live mission
 
-Each mission records chronological evidence:
+## Run locally
 
-- role and evidence scope loaded;
-- model call start, completion, latency, and token usage;
-- full structured response and scoped citations;
-- specialist-to-adjudicator and adjudicator-to-planner handoffs;
-- final recommendation or explicit failure.
+Clone and install:
 
-Credentials and hidden instructions stay excluded. Invalid schema, citation leakage, or model failure
-stops mission; no canned answer silently replaces it.
+```bash
+git clone https://github.com/JadeBear-09/codetrust-agent.git
+cd codetrust-agent
+npm ci
 
-## Safety boundary
+cd backend
+uv sync --extra dev --locked
+cp .env.example .env
+```
 
-- Incident records are locally modelled telecom scenarios.
-- Reasoning outputs come from live Gemini calls during demo.
-- Recommendation requires human approval.
-- No production network, customer system, or controller is connected.
-- ChangeGuard validates proposals; it does not diagnose instead of RAN agent or execute commands.
+Set one backend-only key in ignored `backend/.env`:
 
-## Repository status
+```dotenv
+GEMINI_API_KEY=replace_with_your_key
+```
 
-This cleaned submission repository intentionally contains documentation only:
+Start proof API from `backend/`:
 
-- [README.md](README.md) — product story, mission, evidence, and trust boundary
-- [architecture.md](architecture.md) — component model, contracts, sequencing, and failure semantics
+```bash
+uv run tnoc-proof-api
+```
 
-Executable prototype source is not included in this documentation snapshot.
+Start console from repository root in second terminal:
 
-## Project
+```bash
+cp .env.example .env.local
+npm run dev
+```
 
-**ChangeGuard — Safety Gate for Autonomous Telecom Changes**
+Open [http://127.0.0.1:3000](http://127.0.0.1:3000), then launch live Gemini mission.
 
-Built to demonstrate inspectable multi-agent judgment for telecom operations: isolated evidence,
-visible handoffs, agent-owned decision, and honest advisory control.
+## Proof API
+
+```text
+GET  /v1/proof/config
+POST /v1/proof/runs
+GET  /v1/proof/runs/{run_id}
+GET  /v1/proof/runs/{run_id}/log
+GET  /v1/proof/runs/latest
+```
+
+Example mission request:
+
+```json
+{
+  "mode": "live",
+  "model": "gemini-3.1-flash-lite",
+  "incident_id": "ran-capacity-congestion"
+}
+```
+
+## Audit output
+
+Each mission writes ignored runtime artifacts:
+
+```text
+outputs/agent-missions/<run-id>/run.jsonl
+outputs/agent-missions/<run-id>/summary.json
+outputs/agent-missions/<run-id>/report.md
+```
+
+`run.jsonl` records evidence scope, model-call receipts, structured responses, citations, timing,
+token usage, final adjudication, and final recommendation. Secrets remain excluded.
+
+## Verification
+
+```bash
+npm run lint
+npm test
+
+cd backend
+uv run ruff check src tests
+uv run mypy src
+uv run pytest
+```
+
+CI runs same checks on every push and pull request.
+
+## Security and limitations
+
+- Incident records are modelled local fixtures, not subscriber or production network data.
+- Never commit `.env`, generated outputs, credentials, controller URLs, or private telemetry.
+- No RF equipment, customer system, or production controller is connected.
+- ChangeGuard independently validates RAN proposal; it does not execute network command.
+
+Read [SECURITY.md](SECURITY.md) and [docs/threat-model.md](docs/threat-model.md) before connecting new
+evidence sources or tools.

@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "default_write_policy": "require_approval",
+  "default_destructive_policy": "deny",
+  "required_plan_fields": [
+    "blast_radius",
+    "preconditions",
+    "stop_conditions"
+  ],
+  "auto_approve_tools": [],
+  "denied_tools": []
+}

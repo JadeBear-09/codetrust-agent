@@ -1,0 +1,18 @@
+{
+  "incident_id": "ran-capacity-congestion",
+  "resource_ids": ["CELL-101", "CELL-102", "CELL-103"],
+  "baseline_metrics": {
+    "traffic_load_percent": 93.0,
+    "packet_loss_percent": 1.7,
+    "latency_ms": 88.0
+  },
+  "post_change_metrics": {
+    "traffic_load_percent": 78.0,
+    "packet_loss_percent": 2.8,
+    "latency_ms": 104.0
+  },
+  "verification_thresholds": {
+    "max_packet_loss_percent": 2.0,
+    "max_latency_ms": 95.0
+  }
+}

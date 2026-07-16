@@ -1,0 +1,24 @@
+services:
+  sandbox:
+    build:
+      context: .
+    command: ["tnoc-sandbox"]
+    environment:
+      ENVIRONMENT: development
+      SANDBOX_HOST: 0.0.0.0
+      SANDBOX_PORT: 8090
+    ports:
+      - "8090:8090"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/healthz')"]
+      interval: 3s
+      timeout: 2s
+      retries: 20
+
+  worker:
+    environment:
+      TOOL_CATALOG_PATH: config/tools.sandbox.json
+      SANDBOX_CONTROLLER_URL: http://sandbox:8090
+    depends_on:
+      sandbox:
+        condition: service_healthy

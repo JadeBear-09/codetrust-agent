@@ -1,0 +1,17 @@
+{{- if .Values.components.api.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "tnoc.fullname" . }}-api
+  labels:
+    {{- include "tnoc.labels" . | nindent 4 }}
+spec:
+  ports:
+    - name: http
+      port: {{ .Values.service.port }}
+      targetPort: http
+  selector:
+    app.kubernetes.io/name: {{ include "tnoc.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: api
+{{- end }}

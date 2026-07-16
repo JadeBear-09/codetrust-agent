@@ -1,0 +1,131 @@
+{
+  "version": 1,
+  "tools": [
+    {
+      "name": "sandbox.shift_traffic",
+      "description": "Shift at most 15 percent traffic for the scoped demo cell cluster",
+      "method": "POST",
+      "base_url_env": "SANDBOX_CONTROLLER_URL",
+      "path": "/traffic-shifts",
+      "side_effect": "write",
+      "requires_approval": true,
+      "target_argument_fields": ["cell_ids"],
+      "request_schema": {
+        "type": "object",
+        "properties": {
+          "cell_ids": {
+            "type": "array",
+            "items": {"type": "string", "pattern": "^CELL-[0-9]{3}$"},
+            "minItems": 3,
+            "maxItems": 3,
+            "uniqueItems": true
+          },
+          "shift_percent": {"type": "integer", "minimum": 1, "maximum": 15},
+          "destination_cluster": {"type": "string", "pattern": "^CLUSTER-[A-Z0-9-]+$"}
+        },
+        "required": ["cell_ids", "shift_percent", "destination_cluster"],
+        "additionalProperties": false
+      },
+      "result_fields": ["accepted", "sandbox", "revision", "apply_count", "duplicate_suppressed", "metrics"]
+    },
+    {
+      "name": "sandbox.verify_change",
+      "description": "Independently verify packet loss and latency after the traffic shift",
+      "method": "GET",
+      "base_url_env": "SANDBOX_CONTROLLER_URL",
+      "path": "/verification",
+      "side_effect": "read",
+      "requires_approval": false,
+      "target_argument_fields": ["cell_ids"],
+      "request_schema": {
+        "type": "object",
+        "properties": {
+          "cell_ids": {
+            "type": "array",
+            "items": {"type": "string", "pattern": "^CELL-[0-9]{3}$"},
+            "minItems": 3,
+            "maxItems": 3,
+            "uniqueItems": true
+          }
+        },
+        "required": ["cell_ids"],
+        "additionalProperties": false
+      },
+      "response_schema": {
+        "type": "object",
+        "properties": {
+          "state": {"const": "healthy"},
+          "within_threshold": {"const": true},
+          "sandbox": {"const": true},
+          "revision": {"type": "integer"},
+          "metrics": {"type": "object"}
+        },
+        "required": ["state", "within_threshold", "sandbox", "revision", "metrics"],
+        "additionalProperties": false
+      },
+      "result_fields": ["state", "within_threshold", "sandbox", "revision", "metrics"]
+    },
+    {
+      "name": "sandbox.rollback_traffic",
+      "description": "Restore the captured pre-change traffic state for the scoped cells",
+      "method": "POST",
+      "base_url_env": "SANDBOX_CONTROLLER_URL",
+      "path": "/rollbacks",
+      "side_effect": "write",
+      "requires_approval": true,
+      "target_argument_fields": ["cell_ids"],
+      "request_schema": {
+        "type": "object",
+        "properties": {
+          "cell_ids": {
+            "type": "array",
+            "items": {"type": "string", "pattern": "^CELL-[0-9]{3}$"},
+            "minItems": 3,
+            "maxItems": 3,
+            "uniqueItems": true
+          }
+        },
+        "required": ["cell_ids"],
+        "additionalProperties": false
+      },
+      "result_fields": ["accepted", "sandbox", "revision", "rollback_count", "duplicate_suppressed", "metrics"]
+    },
+    {
+      "name": "sandbox.verify_rollback",
+      "description": "Read the controller independently and prove baseline restoration",
+      "method": "GET",
+      "base_url_env": "SANDBOX_CONTROLLER_URL",
+      "path": "/rollback-verification",
+      "side_effect": "read",
+      "requires_approval": false,
+      "target_argument_fields": ["cell_ids"],
+      "request_schema": {
+        "type": "object",
+        "properties": {
+          "cell_ids": {
+            "type": "array",
+            "items": {"type": "string", "pattern": "^CELL-[0-9]{3}$"},
+            "minItems": 3,
+            "maxItems": 3,
+            "uniqueItems": true
+          }
+        },
+        "required": ["cell_ids"],
+        "additionalProperties": false
+      },
+      "response_schema": {
+        "type": "object",
+        "properties": {
+          "state": {"const": "restored"},
+          "restoration_verified": {"const": true},
+          "sandbox": {"const": true},
+          "revision": {"type": "integer"},
+          "metrics": {"type": "object"}
+        },
+        "required": ["state", "restoration_verified", "sandbox", "revision", "metrics"],
+        "additionalProperties": false
+      },
+      "result_fields": ["state", "restoration_verified", "sandbox", "revision", "metrics"]
+    }
+  ]
+}

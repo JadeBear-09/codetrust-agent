@@ -1,0 +1,18 @@
+{
+  "event_id": "fixture-stadium-781",
+  "name": "Stadium capacity rehearsal",
+  "type": "football_match",
+  "venue": {
+    "name": "North City Stadium",
+    "latitude": 52.5142,
+    "longitude": 13.2409
+  },
+  "starts_at": "2026-07-18T19:30:00+02:00",
+  "ends_at": "2026-07-18T21:30:00+02:00",
+  "estimated_attendance": 47840,
+  "attendance_confidence": 0.72,
+  "attendance_basis": "Configured venue capacity × expected occupancy",
+  "source": "bundled_fixture",
+  "source_retrieved_at": "2026-07-16T00:00:00Z",
+  "live": false
+}

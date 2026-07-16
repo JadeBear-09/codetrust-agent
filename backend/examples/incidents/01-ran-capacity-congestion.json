@@ -1,0 +1,51 @@
+{
+  "id": "ran-capacity-congestion",
+  "title": "Shared RAN cluster exhausts available capacity",
+  "description": "DTDL adapter reports sustained radio-access congestion across one bounded cluster.",
+  "submitted_by": "dtdl-ran-observer",
+  "submitted_at": "2026-07-16T10:00:00Z",
+  "domain": "ran",
+  "resource_ids": ["CELL-101", "CELL-102", "CELL-103"],
+  "sources": {
+    "telemetry": [
+      {
+        "id": "tel.capacity.1",
+        "source": "telemetry",
+        "statement": "CELL-101, CELL-102, and CELL-103 sustain 93% load with rising queue delay and 1.7% packet loss.",
+        "attributes": {
+          "cell_ids": ["CELL-101", "CELL-102", "CELL-103"],
+          "load_percent": 93,
+          "packet_loss_percent": 1.7
+        }
+      }
+    ],
+    "topology": [
+      {
+        "id": "top.capacity.1",
+        "source": "topology",
+        "statement": "Three affected cells share CLUSTER-ALPHA and can shift at most 15% traffic to CLUSTER-BETA.",
+        "attributes": {
+          "source_cluster": "CLUSTER-ALPHA",
+          "destination_cluster": "CLUSTER-BETA",
+          "max_shift_percent": 15
+        }
+      }
+    ],
+    "change_history": [
+      {
+        "id": "chg.capacity.1",
+        "source": "change_history",
+        "statement": "No configuration or software deployment touched affected cells during prior 24 hours.",
+        "attributes": {"recent_change": false}
+      }
+    ],
+    "security": [
+      {
+        "id": "sec.capacity.1",
+        "source": "security",
+        "statement": "Traffic origin distribution matches normal subscriber demand; no attack indicator detected.",
+        "attributes": {"threat_detected": false}
+      }
+    ]
+  }
+}
