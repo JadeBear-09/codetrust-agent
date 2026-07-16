@@ -1,187 +1,116 @@
-# CodeTrust
+# ChangeGuard
 
-[![CI](https://github.com/JadeBear-09/codetrust-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/JadeBear-09/codetrust-agent/actions/workflows/ci.yml)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+**Evidence gate for autonomous telecom changes, powered by six live Gemini roles.**
 
-Evidence-first repository understanding for pull requests.
+Autonomous RAN agents can detect congestion and propose changes within seconds. Detection alone does
+not justify changing a live network. ChangeGuard sits between a proposing agent and network
+controller, independently testing whether each proposed change is supported, bounded, observable,
+and reversible before an operator approves it.
 
-CodeTrust reads a pull request and its exact base repository revision, reconstructs the repository baseline, explains how the change differs, and runs deterministic risk checks. It produces a cited scope comparison and evidence pack without checking out or executing pull-request code.
+> RAN agents propose changes. ChangeGuard decides whether those changes are safe and justified.
 
-> CodeTrust verifies changes. It never merges, deploys, closes, or modifies pull requests.
+## Problem
 
-## What it returns
+A telecom change depends on evidence that should not be blended prematurely:
 
-- repository purpose inferred from base-repository evidence;
-- concise summary of proposed PR behavior;
-- material differences between baseline and change;
-- cited base paths supporting each scope inference;
-- relationship: `aligned`, `adjacent`, `divergent`, or `insufficient`;
-- scope distance from `0` to `100`;
-- deterministic findings with file, line, evidence, impact, and suggested verification;
-- JSON, Markdown, HTML, and adversarial-test artifacts.
+- telemetry proves whether degradation is real;
+- topology constrains where traffic or capacity can move;
+- change history tests whether another deployment caused symptoms;
+- security and demand context distinguish attacks from legitimate load.
 
-```text
-Pull-request URL
-      │
-      ├── PR title/body/diff ───────────── untrusted change claim
-      │
-      └── exact base SHA
-              ├── metadata and history
-              ├── docs and manifests
-              ├── changed/nearby source and tests
-              └── repository structure
-                       │
-                       ▼
-             Repository ↔ PR comparison
-                       │
-                       ▼
-             Deterministic risk gates
-                       │
-                       ▼
-                 Evidence pack
+One generalist response can mix these sources, invent support, or overreach. ChangeGuard assigns each
+domain to a source-isolated specialist, then makes evidence handoffs visible.
+
+## End-to-end mission
+
+```mermaid
+flowchart LR
+    R["RAN agent proposal"] --> G["ChangeGuard evidence gate"]
+    G --> T["Telemetry specialist"]
+    G --> O["Topology specialist"]
+    G --> C["Change-history specialist"]
+    G --> S["Security and demand specialist"]
+    T --> A["Gemini adjudicator"]
+    O --> A
+    C --> A
+    S --> A
+    A --> P["Gemini response planner"]
+    P --> H["Operator approval"]
+    H -. "outside prototype" .-> N["Network controller"]
 ```
 
-## Scope distance
+1. RAN workflow submits incident evidence and proposed action.
+2. Four Gemini specialists run concurrently, each receiving only its authorised source.
+3. Gemini adjudicator receives specialist findings and selects supported root cause.
+4. Gemini response planner returns bounded recommendation, success signals, stop conditions, and
+   rollback triggers.
+5. Operator reviews decision. Prototype never executes network change.
 
-Scope distance measures how far proposed behavior moves from evidence visible in base repository. Lower means closer.
+No preset verdict, expected-answer lookup, cached response, or controller fallback chooses result.
+Schema, citation-scope, and resource-scope checks validate model output without deciding outcome.
 
-| Distance | Relationship | Meaning |
-|---:|---|---|
-| `0–20` | `aligned` | Fits established repository purpose or behavior. |
-| `21–50` | `adjacent` | Extends nearby behavior or ownership. |
-| `51–100` | `divergent` | Expands or conflicts with established purpose or boundaries. |
+## Demonstrated incident
 
-Scope distance is not approval probability, code quality, safety, or maintainer intent. Low distance does not mean maintainers will accept a PR. Roadmap, governance, design preference, and unwritten product decisions may not exist in repository evidence.
+Three cells near stadium sustain approximately 93% utilisation with rising packet loss. RAN agent
+proposes temporary capacity reallocation. ChangeGuard independently checks:
 
-Technical risk remains separate. A scope-aligned change can still `BLOCK` because implementation is unsafe; an adjacent change can have low deterministic risk.
-
-## Quick start
-
-Requirements:
-
-- Python 3.11 or newer;
-- [uv](https://docs.astral.sh/uv/);
-- authenticated [GitHub CLI](https://cli.github.com/);
-- Gemini or OpenAI API key for live repository inference.
-
-```bash
-git clone https://github.com/JadeBear-09/codetrust-agent.git
-cd codetrust-agent
-uv sync --extra dev
-cp .env.example .env
-gh auth login
-uv run codetrust serve
-```
-
-Set one provider key in `.env`:
-
-```dotenv
-GEMINI_API_KEY=your_key
-```
-
-Open [http://127.0.0.1:8787](http://127.0.0.1:8787), paste a GitHub pull-request URL, then select **Verify pull request**.
-
-Alternative launcher:
-
-```bash
-python3 start.py
-```
-
-## CLI
-
-Verify live pull request:
-
-```bash
-uv run codetrust verify \
-  --github-pr https://github.com/OWNER/REPOSITORY/pull/123 \
-  --output-dir reports
-```
-
-Verify local scope and unified diff without model calls:
-
-```bash
-uv run codetrust verify \
-  --ticket path/to/scope.md \
-  --diff path/to/change.diff \
-  --offline \
-  --output-dir reports
-```
-
-Generated files:
-
-- `latest.json` — machine-readable report and provenance;
-- `latest.md` — review-ready evidence report;
-- `latest.html` — visual report;
-- `adversarial-tests.md` — suggested missing proof.
-
-Exit code `0` means verification completed (`PASS` or `NEEDS_REVIEW`), `1` means `BLOCK`, and `2` means invalid input or verification failure. Exact verdict remains in report.
-
-## API
-
-| Endpoint | Purpose |
+| Evidence | Question answered |
 |---|---|
-| `GET /api/health` | Service health. |
-| `GET /api/config` | Safe provider configuration metadata. |
-| `POST /api/github` | Verify live GitHub pull request. |
-| `POST /api/verify` | Verify supplied scope and unified diff. |
-| `GET /api/runs` | Read bounded local run history. |
-| `GET /api/runs/{run_id}` | Read stored report. |
-| `GET /docs` | OpenAPI documentation. |
+| Telemetry | Is congestion current, sustained, and service-affecting? |
+| Topology | Is proposed shift compatible with dependency and capacity limits? |
+| Change history | Could recent deployment explain degradation instead? |
+| Security / demand | Does traffic resemble attack or legitimate event demand? |
 
-```bash
-curl http://127.0.0.1:8787/api/github \
-  -H 'content-type: application/json' \
-  -d '{
-    "reference":"https://github.com/OWNER/REPOSITORY/pull/123",
-    "model_mode":"required"
-  }'
-```
+Supported outcome remains advisory: apply only within approved capacity boundary, observe defined
+KPIs, stop on guardrail breach, and roll back when recovery conditions fail.
 
-## Evidence and trust model
+## Why six Gemini roles?
 
-- Repository evidence comes from exact PR base SHA through bounded read-only GitHub API calls.
-- PR title, description, and diff describe proposed behavior but never establish trusted baseline.
-- Live verification sends bounded repository evidence and PR diff to configured model provider. Do not analyze sensitive private repositories unless provider processing is permitted.
-- Model citations must match supplied base-repository paths.
-- Model output cannot overwrite deterministic findings or risk score.
-- Unsupported evidence routes scope to `insufficient` and verdict to `NEEDS_REVIEW`.
-- Low-risk warnings remain visible without automatically forcing review.
-- Evidence hash detects report-input mutation; it does not prove authorship.
+| Role | Evidence boundary | Responsibility |
+|---|---|---|
+| Telemetry specialist | Metrics only | Identify symptoms, trends, and candidate causes |
+| Topology specialist | Topology only | Validate scope, dependencies, and movement limits |
+| Change-history specialist | Deployment records only | Test temporal causality |
+| Security/demand specialist | Threat and demand signals only | Separate hostile from legitimate load |
+| Adjudicator | Four signed findings | Select root cause, confidence, and supporting citations |
+| Response planner | Adjudicated result | Define safe action envelope and operator controls |
 
-See [architecture](docs/ARCHITECTURE.md) and [security model](SECURITY.md).
+Specialists cannot see or alter each other's conclusions. Adjudicator waits for all findings.
+Planner starts only after adjudication.
 
-## Offline proof
+## Inspectability
 
-Repository includes one deterministic unsafe-payment fixture for development:
+Each mission records chronological evidence:
 
-```bash
-make demo-offline
-make proof
-```
+- role and evidence scope loaded;
+- model call start, completion, latency, and token usage;
+- full structured response and scoped citations;
+- specialist-to-adjudicator and adjudicator-to-planner handoffs;
+- final recommendation or explicit failure.
 
-Fixture never loads in website and never executes code from external pull requests.
+Credentials and hidden instructions stay excluded. Invalid schema, citation leakage, or model failure
+stops mission; no canned answer silently replaces it.
 
-## Development
+## Safety boundary
 
-```bash
-uv sync --extra dev
-uv run pytest
-uv run ruff check .
-uv build
-```
+- Incident records are locally modelled telecom scenarios.
+- Reasoning outputs come from live Gemini calls during demo.
+- Recommendation requires human approval.
+- No production network, customer system, or controller is connected.
+- ChangeGuard validates proposals; it does not diagnose instead of RAN agent or execute commands.
 
-Contribution rules: [CONTRIBUTING.md](CONTRIBUTING.md). Disposable PR workflow: [docs/DRAFT_PR_WORKFLOW.md](docs/DRAFT_PR_WORKFLOW.md).
+## Repository status
 
-## Limitations
+This cleaned submission repository intentionally contains documentation only:
 
-- Current deterministic rules cover selected risk patterns, not full semantic correctness.
-- Scope inference depends on evidence available in repository and may miss unwritten decisions.
-- Current release does not redact secrets before model calls. Use only repositories and diffs safe to share with configured provider.
-- Dashboard is local-first and has no authentication; keep it bound to `127.0.0.1` unless protected by trusted gateway.
-- Live verification requires provider and GitHub availability.
-- `PASS` means no configured review-level blocker was found. It never means universally safe or maintainer-approved.
+- [README.md](README.md) — product story, mission, evidence, and trust boundary
+- [architecture.md](architecture.md) — component model, contracts, sequencing, and failure semantics
 
-## License
+Executable prototype source is not included in this documentation snapshot.
 
-[MIT](LICENSE)
+## Project
+
+**ChangeGuard — Safety Gate for Autonomous Telecom Changes**
+
+Built to demonstrate inspectable multi-agent judgment for telecom operations: isolated evidence,
+visible handoffs, agent-owned decision, and honest advisory control.
